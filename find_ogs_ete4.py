@@ -25,50 +25,99 @@ class OrderedCounter(Counter, OrderedDict):
          return self.__class__, (OrderedDict(self),)
 
 
+class TimerError(Exception):
+
+    """A custom exception used to report errors in use of Timer class"""
+
+
+class Timer:
+    timers = dict()
+
+    def __init__(
+        self,
+        name=None,
+        text="Elapsed time: {:0.4f} seconds",
+        logger=None,
+    ):
+        self._start_time = None
+        self.name = name
+        self.text = text
+        self.logger = logger
+
+        # Add new named timers to dictionary of timers
+        if name:
+            self.timers.setdefault(name, 0)
+
+    def start(self):
+
+        """Start a new timer"""
+
+        if self._start_time is not None:
+
+            raise TimerError(f"Timer is running. Use .stop() to stop it")
+
+
+        self._start_time = time.perf_counter()
+
+    def stop(self):
+        """Stop the timer, and report the elapsed time"""
+        if self._start_time is None:
+            raise TimerError(f"Timer is not running. Use .start() to start it")
+
+        elapsed_time = time.perf_counter() - self._start_time
+        self._start_time = None
+
+        if self.logger:
+            self.logger(self.text.format(elapsed_time))
+        if self.name:
+            self.timers[self.name] += elapsed_time
+
+        return elapsed_time
+
+
+
+def clean_string(string):
+    return string.replace("'","").replace("[", "(").replace("]", ")").replace("=","").replace(".","").replace("-"," ").replace(":","")
+
+
+
+#I have to change this function
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 
-def get_lca(n):
-    lineages = OrderedCounter()
-    nleaves = 0
-    for n in n.get_leaves():        
-        nleaves += 1
-        lineages.update(n.lineage)
 
-    lca = [l for l, count in lineages.items() if count == nleaves]
-    if not lca: 
-        lca = ['Unk']
-    return lca[-1]
+# def get_lca(n):
+    # lineages = OrderedCounter()
+    # nleaves = 0
+    # #for n in n.get_leaves():        
+    # for n in n.props.get('leaves_in'):
+        # nleaves += 1
+        # lineages.update(n.lineage)
+
+    # lca = [l for l, count in lineages.items() if count == nleaves]
+    # if not lca: 
+        # lca = ['Unk']
+    # return lca[-1]
+
+
 
 def load_node_scores(n):
     leaf_targets = []
-    for l in n.props.get('leaves_in'):
+    for l in n.props.get('_leaves_in'):
         leaf_targets.append(l.split('.')[0])
     nspcs = len(set(leaf_targets))   
     
     dups_per_sp = Counter(leaf_targets)
     n.add_prop('inparalogs_rate', np.median(list(dups_per_sp.values())))    
     
-    nseqs = len(n.props.get('leaves_in'))    
+    nseqs = len(n.props.get('_leaves_in'))    
     n.add_prop('score1', (nspcs/SPTOTAL)) 
     n.add_prop('score2', nspcs/nseqs if nseqs else 0.0)
 
 
 
-#FUNCIONES PARA CALCULAR LAS PERDIDAS
-def process_tree(node):
-
-    dup_score, sp1, sp2 = get_dup_score(node)
-    
-    if dup_score > 0.0:    
-        losses1, lin_losses1 = count_losses_ana(expected_sp=sp1|sp2, found_sp=sp1)
-        losses2, lin_losses2= count_losses_ana(expected_sp=sp1|sp2, found_sp=sp2)
-        #en vez de return, añadirlo como property¿?
-        return dup_score, losses1, losses2
-    else:
-        return None, None, None
-       
+#FUNCTIONS TO CALCULATE NODE LOSSES
 
 # def count_losses(expected_sp, found_sp):
     # def is_leaf_2(_n):       
@@ -102,6 +151,24 @@ def process_tree(node):
     # return losses
 
 
+def get_dup_score(n): 
+
+    sp1 = n.props.get('_sp_in_ch1')
+    sp2 = n.props.get('_sp_in_ch2')
+
+    if len(sp1) == 0 and len(sp2) == 0:
+        return 0, None, None
+
+    a = np.array([len(sp1), len(sp2)]) 
+    minval = np.min(a[np.nonzero(a)])
+
+    dup_score = len(sp1 & sp2) / minval
+    
+    #Idea -> add_prop instead of return¿?
+    return dup_score, sp1, sp2
+
+
+
 def count_losses_ana(expected_sp, found_sp):
     def is_leaf_2(_n):
         if not _n.children: 
@@ -127,25 +194,20 @@ def count_losses_ana(expected_sp, found_sp):
     
     return losses, lin_losses
 
+def process_tree(node):
+
+    dup_score, sp1, sp2 = get_dup_score(node)
+    
+    if dup_score > 0.0:    
+        losses1, lin_losses1 = count_losses_ana(expected_sp=sp1|sp2, found_sp=sp1)
+        losses2, lin_losses2= count_losses_ana(expected_sp=sp1|sp2, found_sp=sp2)
+        # Add properties instead of return¿?
+        return dup_score, losses1, losses2
+    else:
+        return None, None, None
 
 
-def get_dup_score(n): 
-
-    sp1 = n.props.get('sp_in_ch1')
-    sp2 = n.props.get('sp_in_ch2')
-
-    if len(sp1) == 0 and len(sp2) == 0:
-        return 0, None, None
-
-    a = np.array([len(sp1), len(sp2)]) 
-    minval = np.min(a[np.nonzero(a)])
-
-    dup_score = len(sp1 & sp2) / minval
-    #en vez de return, añadirlo como property¿?
-    return dup_score, sp1, sp2
-
-
-def count_losses_sp(expected_sp, found_sp):
+def count_losses_percentage(expected_sp, found_sp):
     def is_leaf_2(_n):
         if not _n.children: 
             return True
@@ -166,95 +228,110 @@ def count_losses_sp(expected_sp, found_sp):
     return losses, per_loss
 
 
-def proces_node_sp(node):
+
+def percentage_losses(node):
   
     dup_score, sp1, sp2 = get_dup_score(node)
     
+    #Calculate number of losses as number of expected species - number of found species
+    #Calculate percentage of losses as losses / number of expected species
     if dup_score > 0.0:    
-        losses1, per_loss1 = count_losses_sp(expected_sp=sp1|sp2, found_sp=sp1)
-        losses2, per_loss2 = count_losses_sp(expected_sp=sp1|sp2, found_sp=sp2) 
+        losses1, per_loss1 = count_losses_percentage(expected_sp=sp1|sp2, found_sp=sp1)
+        losses2, per_loss2 = count_losses_percentage(expected_sp=sp1|sp2, found_sp=sp2) 
+        # Add properties instead of return¿?
         return dup_score, losses1, losses2, per_loss1, per_loss2
     else:
         return None, None, None, None, None
 
 
-#FUNCIONES PARA ENCONTRAR OUTLIERS
-
-def proces_node(n):
-    #count_lin: dict para contar por cada nivel de profundidad para cada taxid el nº de seqs (ej, para Bilateria que seria nivel 6, cuantas seqs hay en ese nodo {6:{33213:x}})
+#FUNCTIONS TO DETECT OUTLIERS
+def outliers_detection(n):
+   
+    #count_lin : Count for each index level, for each taxid at that index level, how many seqs (Bilateria is level 6 -> {6:{33213:x}})
     count_lin = defaultdict(lambda: defaultdict(int))
 
-    #count_lin_mem: dict para guardar por cada nivel de profundidad para cada taxid los seqs.name 
+    #count_lin_mem: for each index level, for each taxid at that index level, save leaves names
     count_lin_mem = defaultdict(lambda: defaultdict(list))
 
-    #para el nodo guarda todas las seqs, independientemente del linaje que tengan
+    #Save sp in node,  it doesnt matter that for the same sp there are several seqs
     sp_in_node = set()
+    #For each taxonomic level in the leaves's lineage, save sp under that level 
     sp_per_level = defaultdict(set)
 
-    leaves = CONTENT[n]
-    
-    for l in leaves:
-        #las sp solo las tengo en cuenta la primera vez que aparecen (me da igual que haya varias seqs q la misma sp)
-        if l.props.get('taxid') not in sp_in_node: 
-            sp_in_node.add(l.props.get('taxid'))
-            for index, tax in enumerate(l.props.get('lineage')):
-                count_lin[index][tax] += 1
-                count_lin_mem[index][tax].append(l.props.get('name'))
-                sp_per_level[tax].add(str(l.props.get('taxid')))
+    #leaves = CONTENT[n]
+    for l in CONTENT[n]:
+
+        #if l.props.get('taxid') not in sp_in_node: 
+        sp_in_node.add(l.props.get('taxid'))
+        for index, tax in enumerate(l.props.get('lineage')):
+            count_lin[index][tax] += 1
+            count_lin_mem[index][tax].append(l.props.get('name'))
+            sp_per_level[tax].add(str(l.props.get('taxid')))
                 
     sp2remove = set()
 
+    #For each taxid from lineages
     for level, linages in count_lin.items():
             
-        #si para un mismo nivel hay mas de un linaje, ej nivel 0 son todas root pero en nivel 1 hay euk y bact
+        #Detect outliers only for index levels with more than one taxid, (level 0, all seqs belong to root, but level 1 seqs belong to euk and bact)
         if len(linages.keys())>1:
                 
             for tax, num in linages.items():
-                #num = numero de sp para ese nivel taxonomico en el nodo
-                #sp_in_node = todas las sp que hay en el nodo
-                #global_linages = numero de sp para ese nivel taxonomico en todo el arbol
-                #SPTOTAL = numero de sp en total del arbol
-                #levels_eggnog = numero de sp para ese nivel taxonomico en eggnog
+                #num = How many sp there are at that taxonomic level in the node 
+                #sp_in_node = all sp in the node 
+                #levels_eggnog = number of sp at that taxonomic level in reftree (ej sp number of bilateria in eggnog reftree )
+                
+                #Not in use:
+                    #global_linages = numero de sp para ese nivel taxonomico en todo el arbol
+                    #SPTOTAL = numero de sp en total del arbol
 
-                #% linaje en el nodo
+
+                #% lineage in the node
                 per_Node = num / len(sp_in_node)
                 node_lin[n.name][tax] = num
 
-                #% linaje  el arbol
+                #% linege in tree
                 #per_Tree = num / global_linages[level][tax]
-                per_Tree_total = num /SPTOTAL
+                #per_Tree_total = num /SPTOTAL
                 
-                #% linaje en eggnog
-                per_Egg = num / levels_eggnog[str(tax)]
+                #% lineage in reftree
+                per_Egg = num / levels_eggnog.get(str(tax), 2)
                 #per_Egg_total = levels_eggnog[str(tax)] / len(reftree)
                 
+
+                # If % of sp in the node at that taxonomic level is below 1%  and % of sp in reftree is below 5%, remove that species, that means:
+                    # 1. The taxonomic level has to be rare in the node (a few porifera species inside a node with all bilateria)
+                    # 2. If there are few representatives from reftree at that taxonomic level,     
+                    #   (in the node there are 2 porifera species but in reftree there are 200 porifera species)
+                    # 3. Taxonomic level that are rare in eggnog, will be preserved
+
                 if per_Egg <0.05 and per_Node < 0.01:
                     sp2remove.update(sp_per_level[tax])
                     
     return sp2remove
 
-
+#Add propeties to the root node
 def annotate_root(og_dict, node):
     name = node.props.get('name')
-    og_dict[name]['mems'] = node.props.get('all_mems')
+    og_dict[name]['mems'] = node.props.get('_all_mems')
     og_dict[name]['lca'] = node.props.get('lca_node')
     og_dict[name]['dup_lineage'] = list(ncbi.get_lineage(node.props.get('lca_node')))
     og_dict[name]['so_score'] = node.props.get('so_score')
     og_dict[name]['is_root'] = 'True'
     og_dict[name]['dup_node_name'] = name 
 
-
+#Add properties to the  intertal nodes
 def annotate_dups_ch(og_dict, total_mems_in_ogs, node, ch_node):
 
     if ch_node == 'ch1':
         og_name_ch = node.props.get('ch1_name')
-        og_ch_mems = node.props.get('leaves_ch1')
-        sp_ch = node.props.get('sp_in_ch1')
+        og_ch_mems = node.props.get('_leaves_ch1')
+        sp_ch = node.props.get('_sp_in_ch1')
         target_node = node.search_nodes(name=og_name_ch)[0]
     elif ch_node == 'ch2':
         og_name_ch = node.props.get('ch2_name')
-        og_ch_mems = node.props.get('leaves_ch2')
-        sp_ch = node.props.get('sp_in_ch2')
+        og_ch_mems = node.props.get('_leaves_ch2')
+        sp_ch = node.props.get('_sp_in_ch2')
         target_node = node.search_nodes(name=og_name_ch)[0]
 
     
@@ -270,8 +347,8 @@ def annotate_dups_ch(og_dict, total_mems_in_ogs, node, ch_node):
         target_node.add_prop('lca_dup', node.props.get('lca_node'))
         target_node.add_prop('so_score_dup', node.props.get('so_score'))
 
-        sp_in_og = target_node.props.get('sp_in')
-        sp_in_anc_og = node.props.get('sp_in')
+        sp_in_og = target_node.props.get('_sp_in')
+        sp_in_anc_og = node.props.get('_sp_in')
         diff_sp = list(set(sp_in_anc_og).difference(set(sp_in_og)))
 
         if len(diff_sp) >=1:
@@ -292,7 +369,9 @@ def annotate_dups_ch(og_dict, total_mems_in_ogs, node, ch_node):
                 l_name = ncbi.get_taxid_translator([lin])[lin]
                 miss_lin_perc[l_name] = perc_loss
             
-            target_node.add_prop('miss_lineage', miss_lin_perc)
+            miss_lineages = list(miss_lin_perc.keys())
+
+            target_node.add_prop('miss_lineage', miss_lineages)
             target_node.add_prop('miss_sp', diff_sp)
            
         else:
@@ -322,6 +401,17 @@ path_out = args.out_path
 taxonomy = args.taxonomy
 rtree = args.reftree
 
+#timers
+total_time = Timer("Total")
+_t0 = Timer("Start")
+_t1 = Timer("Outliers")
+_t2 = Timer("Iter_dups")
+_t3 = Timer("OGs_file")
+_t4 = Timer("Fastas")
+_t5 = Timer("Post_tree")
+
+total_time.start()
+_t0.start()
 
 if args.ncbitaxa:
     print(str(args.ncbitaxa))
@@ -330,82 +420,97 @@ else:
     ncbi = NCBITaxa()
 
 
-print('-load taxonomy')
+print('-Load taxonomy')
 levels_eggnog = {}
 with open(taxonomy) as levels:
     levels_eggnog = json.load(levels)
 
 
-print('-load reftree')
+print('-Load reftree')
 reftree = PhyloTree(rtree)
-refn2sp = reftree.get_cached_content(store_attr='name', container_type=set)
-print(len(reftree))
+#refn2sp = reftree.get_cached_content(store_attr='name', container_type=set)
+print('--Len reftree: ', len(reftree))
 
 
 print('START PROCESSING TREE')
 t.resolve_polytomy()
 if  args.midpoint  and args.midpoint == "yes":
-    print('MIDPOINT ROOTING')
+    print('-Midpoint rooting')
     midpoint = t.get_midpoint_outgroup()
     t = t.set_outgroup(midpoint)
 
+# Parsing function used to extract species name from a node’s name.
 t.set_species_naming_function(lambda x: x.split('.')[0])
+# Adding additional information to any internal a leaf node (sci_name, taxid, named_lineage, lineage, rank)
 ncbi.annotate_tree(t,  taxid_attr="species")
 
-ref_leaves_names = []
-for l in reftree.get_leaves():
-    ref_leaves_names.append(l.name)
+# ref_leaves_names = []
+# for l in reftree.get_leaves():
+    # ref_leaves_names.append(l.name)
 
 
-#count how many species are in each taxonomic level
-taxa = {}
+# Count how many species are in each taxonomic level
+#counter_taxono = defaultdict(int)
+#global_linages = defaultdict(lambda: defaultdict(int))
+#taxa = {}
+
+# Total species in tree and total members in tree
 sp_set = set()
-counter_taxono = defaultdict(int)
-global_linages = defaultdict(lambda: defaultdict(int))
-
 total_mems_in_tree = set()
+
+# Check that all species has lineage in ncbi taxonomy
 miss_lineages = []
 
+# Detect all evolutionary events (Speciation or Duplicaton node) in the tree
 t.get_descendant_evol_events()
 
 for n in t.traverse("preorder"):
     if not n.is_leaf():
+        #Create an ID for each internal node
         name = id_generator()
         n.add_prop('name', name)
     else:
         total_mems_in_tree.add(n.name)
+        sp_set.add(n.props.get('taxid'))
 
         if len(n.props.get('lineage')) == 0:
             miss_lineages.append(n.props.get('taxid'))
         
-        if n.props.get('taxid') not in sp_set:
-            sp_set.add(n.props.get('taxid'))
-            for index, term in enumerate(n.props.get('lineage')):
-                global_linages[index][term] += 1
-                counter_taxono[term] +=1
+        # if n.props.get('taxid') not in sp_set:
+            # sp_set.add(n.props.get('taxid'))
+            # for index, term in enumerate(n.props.get('lineage')):
+                # global_linages[index][term] += 1
+                # counter_taxono[term] +=1
 
-print('MISS LING: ', len(miss_lineages))
+print('-Missing Lineages: ', len(miss_lineages))
 SPTOTAL = len(sp_set)
+print('-Total species in tree:', SPTOTAL)
 
 # Let's cache the list of leaves under each internal node. 
 # This is a global variable.
 CONTENT = t.get_cached_content()
 
+# For each node, for each taxid in lineage, save number of species under that taxid,
+# This dict is fill during outliers detection and its used in annotate_dups_ch() to annotate missing lineages
 node_lin = defaultdict(dict)
 
+_t0.stop()        
 
 print('DETECT OUTLIERS AND DUPS SCORE FUNCTION')
-
+_t1.start()
 root_name = t.name
 t.add_prop('is_root', 'True')
-t.add_prop('all_mems', list(total_mems_in_tree))
+t.add_prop('_all_mems', clean_string(str(list(total_mems_in_tree))))
 
 for n in t.traverse("preorder"):
+
+    n.del_prop('named_lineage')
+    sci_name = clean_string(n.props.get('sci_name'))
+    n.add_prop('sci_name', sci_name)
     
     if n.is_leaf():
-       # sci_name = ncbi.get_taxid_translator([n.taxid])[n.taxid]
         n.add_prop('lca_node', n.props.get('taxid'))
-
+        
     else:
         
         #DETECT OUTLIERS
@@ -422,9 +527,10 @@ for n in t.traverse("preorder"):
                 if int(sp) in [leaf.props.get('taxid') for leaf in CONTENT[n]]:
                     sp_out.add(sp)
 
-        #Only detect outliers if node is a duplication node
+        #Only detect outliers if node is a duplication node (For saving time)
         if n.props.get('evoltype') == 'D':
-            sp_out.update(proces_node(n))
+            sp_out.update(outliers_detection(n))
+            
             if len(sp_out) > 0:
                 all_leafs = CONTENT[n]
                 for l in all_leafs:
@@ -442,37 +548,40 @@ for n in t.traverse("preorder"):
             for l in  CONTENT[n]:
                 sp_in.add(str(l.props.get('taxid')))
                 leaves_in.add(l.props.get('name'))
-
-
-        sp_out_sciName = []
-        if sp_out:
-            for sp in sp_out:
-                sciName = ncbi.get_taxid_translator([int(sp)])[int(sp)]
-                sp_out_sciName.append(sciName.replace("'","").replace("[", "(").replace("]", ")").replace("=","").replace(".","").replace("-"," ").replace(":"," "))
+            
+        # sp_out_sciName = []
+        # if sp_out:
+            # for sp in sp_out:
+                # sciName = ncbi.get_taxid_translator([int(sp)])[int(sp)]
+                # sp_out_sciName.append(sciName.replace("'","").replace("[", "(").replace("]", ")").replace("=","").replace(".","").replace("-"," ").replace(":"," "))
         
-        n.add_prop('sp_out_name', sp_out_sciName)
+        # n.add_prop('sp_out_name', sp_out_sciName)
 
+        #Save info for children_node_1
         all_spcs = set()
-
         ch1 = n.children[0]
         ch1_name = n.children[0].props.get('name')
         sp_ch1 = set()
         leaves_ch1 = set()
+
         for l in ch1:
             if str(l.props.get('taxid')) not in sp_out:
                 all_spcs.add(str(l.props.get('taxid')))
                 sp_ch1.add(str(l.props.get('taxid')))
                 leaves_ch1.add(l.props.get('name'))
 
+        #Save info for children_node_2
         ch2 = n.children[1]
         ch2_name = n.children[1].props.get('name')
         sp_ch2 = set()
         leaves_ch2 = set()
+        
         for l in ch2:
             if str(l.props.get('taxid')) not in sp_out:
                 all_spcs.add(str(l.props.get('taxid')))
                 sp_ch2.add(str(l.props.get('taxid')))
-                leaves_ch2.add(l.props.get('name'))
+                leaves_ch2.add(l.props.get('name')) 
+    
 
         #Re-calculate species overlap after detect outliers
         overlaped_spces = set(sp_ch1 & sp_ch2)
@@ -480,76 +589,86 @@ for n in t.traverse("preorder"):
             so_score = float(len(overlaped_spces) / len(all_spcs))
         else:
             so_score = 0.0
+
         
         #Calculate common ancestor and rank for the species included in that node
+        #######SLOW STEP#########
         if len(sp_in) > 0:
             lca_node = ncbi.get_topology(list(sp_in)).props.get('taxid')
             rank = ncbi.get_rank([lca_node])[lca_node]
             lin_lca = ncbi.get_lineage(lca_node)
-
+        #########################
+        
+        
         #If there is upper node, save upper node ancestor
-        if n.up:
-            lca_node_up = n.up.props.get('lca_node')
-            lin_lca_node_up = ncbi.get_lineage(lca_node_up)
-        else:
-            lin_lca_node_up = []
-
-        #If ancestor of current node is more ancient that ancestor of upper node, change ancestor of current node to ancestor of upper node
+        # if n.up:
+            # lca_node_up = n.up.props.get('lca_node')
+            # lin_lca_node_up = ncbi.get_lineage(lca_node_up)
+        # else:
+            # lin_lca_node_up = []
+        
+        
         #If node is a speciation node, outliers are not detected, so ancestor node can be more ancient that previous ancestor node
-        if len(lin_lca) < len(lin_lca_node_up):
-            n.add_prop('lca_node', lca_node_up)
-            lca_node_name = ncbi.get_taxid_translator([lca_node_up])[lca_node_up]
+        #If ancestor of current node is more ancient that ancestor of upper node, change ancestor of current node to ancestor of upper node
+        # if len(lin_lca) < len(lin_lca_node_up):
+            # n.add_prop('lca_node', lca_node_up)
+            # lca_node_name = ncbi.get_taxid_translator([lca_node_up])[lca_node_up]
             
-        else:
-            n.add_prop('lca_node', lca_node)
-            lca_node_name = ncbi.get_taxid_translator([lca_node])[lca_node]
-
+        # else:
+        n.add_prop('lca_node', lca_node)
+        lca_node_name = ncbi.get_taxid_translator([lca_node])[lca_node]
+        
 
         #SAVE PROPERTIES
-        n.add_prop('lca_node_name', lca_node_name)
+        n.add_prop('lca_node_name', lca_node_name.replace(":", ""))
         n.add_prop('rank', rank)
-        n.add_prop('sp_in', sp_in)
-        n.add_prop('sp_in_ch1', sp_ch1)
-        n.add_prop('sp_in_ch2', sp_ch2)
+        n.add_prop('_sp_in', sp_in)
+        n.add_prop('_sp_in_ch1', sp_ch1)
+        n.add_prop('_sp_in_ch2', sp_ch2)
         n.add_prop('ch1_name', ch1_name)
         n.add_prop('ch2_name', ch2_name)
-        n.add_prop('leaves_in', leaves_in)
-        n.add_prop('leaves_ch1',list(leaves_ch1))
-        n.add_prop('leaves_ch2',list(leaves_ch2))
+        n.add_prop('_leaves_in', leaves_in)
+        n.add_prop('_leaves_ch1',list(leaves_ch1))
+        n.add_prop('_leaves_ch2',list(leaves_ch2))
         n.add_prop('sp_out', list(sp_out))
-        n.add_prop('leaves_out', list(leaves_out))
+        n.add_prop('_leaves_out', list(leaves_out))
         n.add_prop('so_score', so_score)
+        n.add_prop('lineage', clean_string(str(n.props.get('lineage'))))
+        
 
         if so_score > 0:
             n.add_prop('evoltype_2', 'D')
         else:
             n.add_prop('evoltype_2', 'S')
+        
 
-        #esta funcion añade las propiedades score1, score2 e inparalogs_rate
+        #load_node_scores add properties: score1, score2 and inpalalogs_rate
         load_node_scores(n)
-
-        dup_score, losses1, losses2, per_loss1, per_loss2 = proces_node_sp(n)
+       
+        ######SLOW STEP#######
+        dup_score, losses1, losses2, per_loss1, per_loss2 = percentage_losses(n)
         if per_loss1 != None and per_loss1 > 0.7 and per_loss2 != None  and per_loss2 >0.7:
             n.add_prop('evoltype_2', 'FD')
         n.add_prop('sp_loss',  [dup_score, losses1, losses2, per_loss1, per_loss2])
         
         
+        ######SLOW STEP#######
         dup_score, loss1, loss2 = process_tree(n)
         if dup_score != None:
             n.add_prop('dup_score', [dup_score, loss1, loss2])
         else:
             n.add_prop('dup_score', [])
+        
 
+_t1.stop()
 
+_t2.start()
 #og_dict, save info of nodes that are OGs
 og_dict = defaultdict(dict)
 
 #tax_dups_og, set with the ancestors of the nodes that are OGs
 tax_dups_og = set()
-
 total_mems_in_ogs = set()
-
-
 
 #Traverse tree to find the nodes that are "good" duplications and generate OGs.
 print('ITER DUPS')
@@ -559,7 +678,7 @@ for node in t.traverse("preorder"):
         annotate_root(og_dict, node)
                         
     if not node.is_leaf() and node.props.get('evoltype_2') == 'D' and 0.2 < float(node.props.get('so_score')) \
-    and len(node.props.get('leaves_in')) >2 and len(node.props.get('sp_in')) > 2 :
+    and len(node.props.get('_leaves_in')) >2 and len(node.props.get('_sp_in')) > 2 :
     #and float( len(properties[node.name]['sp_in']) / counter_taxono[(node.lca_node)] ) > 0.6:
         
         dups_under_node = []
@@ -582,7 +701,7 @@ for node in t.traverse("preorder"):
                 #dups por debajo del nodo principal anotadas al mismo nivel
                 for n_ in  dups_under_ch1:
                     if float(n_.props.get('so_score'))> 0.2  \
-                    and len(n_.props.get('leaves_ch1')) >2 and len(n_.props.get('sp_in_ch1'))> 2 :
+                    and len(n_.props.get('_leaves_ch1')) >2 and len(n_.props.get('_sp_in_ch1'))> 2 :
                     #and float( len(properties[n_.name]['sp_in']) / counter_taxono[(lca_target)] ) > 0.6:
 
                         root2node = node.get_distance(node, n_, topology_only=True)
@@ -591,7 +710,7 @@ for node in t.traverse("preorder"):
             if len(dups_under_ch2)> 0:
                 for n_ in  dups_under_ch2:
                     if float(n_.props.get('so_score'))> 0.2  \
-                    and len(n_.props.get('leaves_ch2'))>2 and len(n_.props.get('sp_in_ch2'))> 2 :
+                    and len(n_.props.get('_leaves_ch2'))>2 and len(n_.props.get('_sp_in_ch2'))> 2 :
                     #and float( len(properties[n_.name]['sp_in']) / counter_taxono[(lca_target)] ) > 0.6:
 
                         root2node = node.get_distance(node, n_, topology_only=True)
@@ -610,9 +729,12 @@ for node in t.traverse("preorder"):
             annotate_dups_ch(og_dict, total_mems_in_ogs, node, 'ch1')
             annotate_dups_ch(og_dict, total_mems_in_ogs, node, 'ch2')
 
+_t2.stop()
+
 
 ###########################################################################################################3
 
+_t3.start()
 print('ogs tree')
 for name_og, info in og_dict.items():
     mems_og = set(info['mems'])
@@ -657,8 +779,12 @@ og_mems_out = path_out+'/'+name_tree+'_mems.json'
 with open(og_mems_out, 'w') as f:
     json.dump(og_dict, f, indent=2)
 
+_t3.stop()
 
+        
 ######################################################################################
+
+_t4.start()
 print('#Writing fastas')
 diff = (total_mems_in_tree.difference(total_mems_in_ogs))
 
@@ -679,16 +805,30 @@ for name_og, info in og_dict.items():
                 aa = fasta.get_seq(m)
                 f_out.write('>'+m+'\n'+aa+'\n')
 
+_t4.stop()
 
+        
 ############################################################################
+
+_t5.start()
+# clean strings
+all_props = set()
+for n in t.traverse():
+    for string in ("sci_name", "lca_node_name"):
+        prop = n.props.get(string)
+        if prop:
+            n.props[string] = clean_string(prop)
+    all_props.update(set(n.props.keys()))
 
 
 print('#Writing post tree')
 post_tree = path_out+'/'+'post_'+name_fam+'.nw'
-t.write(format=1, outfile=post_tree)
+t.write(format=1, outfile=post_tree, properties=all_props)
 
-print("--- %s min---" % ((time.time() - start_time)/60))
-        
+
+_t5.stop()  
+total_time.stop()
+print(Timer.timers)     
 
 
         
