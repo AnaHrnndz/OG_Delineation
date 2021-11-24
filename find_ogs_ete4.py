@@ -163,13 +163,15 @@ def get_dup_score(n):
     minval = np.min(a[np.nonzero(a)])
 
     dup_score = len(sp1 & sp2) / minval
+    print(n.name, dup_score)
     
     #Idea -> add_prop instead of return¿?
-    return dup_score, sp1, sp2
+   
+    return dup_score#, sp1, sp2
 
 
 
-def count_losses_ana(expected_sp, found_sp):
+def count_lineage_losses(expected_sp, found_sp):
     def is_leaf_2(_n):
         if not _n.children: 
             return True
@@ -194,20 +196,25 @@ def count_losses_ana(expected_sp, found_sp):
     
     return losses, lin_losses
 
-def process_tree(node):
+def losses(node):
 
-    dup_score, sp1, sp2 = get_dup_score(node)
+    #dup_score, sp1, sp2 = get_dup_score(node)
+    sp1 = n.props.get('_sp_in_ch1')
+    sp2 = n.props.get('_sp_in_ch2')
     
-    if dup_score > 0.0:    
-        losses1, lin_losses1 = count_losses_ana(expected_sp=sp1|sp2, found_sp=sp1)
-        losses2, lin_losses2= count_losses_ana(expected_sp=sp1|sp2, found_sp=sp2)
+    if float(node.props.get('dup_score')) > 0.0:   
+        losses1, lin_losses1 = count_lineage_losses(expected_sp=sp1|sp2, found_sp=sp1)
+        losses2, lin_losses2= count_lineage_losses(expected_sp=sp1|sp2, found_sp=sp2)
         # Add properties instead of return¿?
-        return dup_score, losses1, losses2
-    else:
-        return None, None, None
+        #return dup_score, losses1, losses2
+        node.add_prop('num_lineage_losses', [losses1, losses2])
+        node.add_prop('_name_lineage_losses', [lin_losses1, lin_losses2])
+        #return losses1, losses2
+    # else:
+        # return None, None, None
 
 
-def count_losses_percentage(expected_sp, found_sp):
+def count_species_losses(expected_sp, found_sp):
     def is_leaf_2(_n):
         if not _n.children: 
             return True
@@ -231,13 +238,16 @@ def count_losses_percentage(expected_sp, found_sp):
 
 def percentage_losses(node):
   
-    dup_score, sp1, sp2 = get_dup_score(node)
+    #dup_score, sp1, sp2 = get_dup_score(node)
+    sp1 = n.props.get('_sp_in_ch1')
+    sp2 = n.props.get('_sp_in_ch2')
     
-    #Calculate number of losses as number of expected species - number of found species
-    #Calculate percentage of losses as losses / number of expected species
-    if dup_score > 0.0:    
-        losses1, per_loss1 = count_losses_percentage(expected_sp=sp1|sp2, found_sp=sp1)
-        losses2, per_loss2 = count_losses_percentage(expected_sp=sp1|sp2, found_sp=sp2) 
+    
+    #Calculate number of losses -> number of expected species - number of found species
+    #Calculate percentage of losses -> losses / number of expected species
+    if float(node.props.get('dup_score')) > 0.0:    
+        losses1, per_loss1 = count_species_losses(expected_sp=sp1|sp2, found_sp=sp1)
+        losses2, per_loss2 = count_species_losses(expected_sp=sp1|sp2, found_sp=sp2) 
         # Add properties instead of return¿?
         return dup_score, losses1, losses2, per_loss1, per_loss2
     else:
@@ -301,9 +311,9 @@ def outliers_detection(n):
 
                 # If % of sp in the node at that taxonomic level is below 1%  and % of sp in reftree is below 5%, remove that species, that means:
                     # 1. The taxonomic level has to be rare in the node (a few porifera species inside a node with all bilateria)
-                    # 2. If there are few representatives from reftree at that taxonomic level,     
-                    #   (in the node there are 2 porifera species but in reftree there are 200 porifera species)
-                    # 3. Taxonomic level that are rare in eggnog, will be preserved
+                    # 2. Also there has to be few representatives from reftree at that taxonomic level, those leaves will be remove     
+                    #   (in the node there are 2 porifera species but in reftree there are 2000 porifera species)
+                    # 3. Taxonomic level that are rare in reftree, will be preserved 
 
                 if per_Egg <0.05 and per_Node < 0.01:
                     sp2remove.update(sp_per_level[tax])
@@ -634,7 +644,6 @@ for n in t.traverse("preorder"):
         n.add_prop('_leaves_out', list(leaves_out))
         n.add_prop('so_score', so_score)
         n.add_prop('lineage', clean_string(str(n.props.get('lineage'))))
-        
 
         if so_score > 0:
             n.add_prop('evoltype_2', 'D')
@@ -644,22 +653,30 @@ for n in t.traverse("preorder"):
 
         #load_node_scores add properties: score1, score2 and inpalalogs_rate
         load_node_scores(n)
+        dup_score = get_dup_score(n)
+        
+        n.add_prop('dup_score', dup_score)
+
        
         ######SLOW STEP#######
         dup_score, losses1, losses2, per_loss1, per_loss2 = percentage_losses(n)
+
         if per_loss1 != None and per_loss1 > 0.7 and per_loss2 != None  and per_loss2 >0.7:
             n.add_prop('evoltype_2', 'FD')
-        n.add_prop('sp_loss',  [dup_score, losses1, losses2, per_loss1, per_loss2])
-        
+
+        n.add_prop('species_loss',  [dup_score, losses1, losses2, per_loss1, per_loss2])
         
         ######SLOW STEP#######
-        dup_score, loss1, loss2 = process_tree(n)
-        if dup_score != None:
-            n.add_prop('dup_score', [dup_score, loss1, loss2])
-        else:
-            n.add_prop('dup_score', [])
+        #losses() add propeties 'num_lineage_losses' and '_name_lineage_losses' 
+        losses(n)
         
-
+        
+        # if dup_score != None:
+            # n.add_prop('lineage_loss', list(loss1, loss2))
+        # else:
+            # n.add_prop('lineage_loss', [])
+        
+        
 _t1.stop()
 
 _t2.start()
