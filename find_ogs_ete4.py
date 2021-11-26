@@ -219,13 +219,13 @@ def losses(node):
 
 
 def count_species_losses(expected_sp, found_sp):
-    def is_leaf_2(_n):
-        if not _n.children: 
-            return True
-        elif len(found_sp & set(_n.get_leaf_names())) == 0:
-            return True
-        else: 
-            return False
+    # def is_leaf_2(_n):
+        # if not _n.children: 
+            # return True
+        # elif len(found_sp & set(_n.get_leaf_names())) == 0:
+            # return True
+        # else: 
+            # return False
 
     if len(expected_sp) == 1: 
         return 0, 0
@@ -233,7 +233,8 @@ def count_species_losses(expected_sp, found_sp):
     root = reftree.get_common_ancestor(expected_sp)
     #root.annotate_ncbi_taxa(taxid_attr="name")
    
-    losses = len(root) - len(found_sp)
+    #losses = len(root) - len(found_sp)
+    losses = len(expected_sp)
     per_loss = losses / len(root)
     
     return losses, per_loss
@@ -331,7 +332,7 @@ def outliers_detection(n):
 def annotate_root(og_dict, node):
     name = node.props.get('name')
     og_dict[name]['mems'] = node.props.get('_all_mems')
-    og_dict[name]['lca'] = node.props.get('lca_node')
+    og_dict[name]['lca_dup'] = node.props.get('lca_node')
     og_dict[name]['dup_lineage'] = list(ncbi.get_lineage(node.props.get('lca_node')))
     og_dict[name]['so_score'] = node.props.get('so_score')
     og_dict[name]['is_root'] = 'True'
@@ -559,7 +560,13 @@ for n in t.traverse("preorder"):
         #if n.props.get('evoltype') == 'D':
         _t6.start()
         sp_out.update(outliers_detection(n))
+        ch1 = n.children[0]
+        sp_out.update(outliers_detection(ch1))
+        ch2 = n.children[1]
+        sp_out.update(outliers_detection(ch2))
         _t6.stop()
+
+
         if len(sp_out) > 0:
             all_leafs = CONTENT[n]
             for l in all_leafs:
@@ -587,7 +594,7 @@ for n in t.traverse("preorder"):
 
         #Save info for children_node_1
         all_spcs = set()
-        ch1 = n.children[0]
+        
         ch1_name = n.children[0].props.get('name')
         sp_ch1 = set()
         leaves_ch1 = set()
@@ -599,7 +606,7 @@ for n in t.traverse("preorder"):
                 leaves_ch1.add(l.props.get('name'))
 
         #Save info for children_node_2
-        ch2 = n.children[1]
+        
         ch2_name = n.children[1].props.get('name')
         sp_ch2 = set()
         leaves_ch2 = set()
@@ -615,6 +622,7 @@ for n in t.traverse("preorder"):
         overlaped_spces = set(sp_ch1 & sp_ch2)
         if len(overlaped_spces)>0:
             so_score = float(len(overlaped_spces) / len(all_spcs))
+            n.add_prop('overlap', overlaped_spces)
         else:
             so_score = 0.0
 
@@ -770,48 +778,56 @@ _t2.stop()
 
 _t3.start()
 print('ogs tree')
-for name_og, info in og_dict.items():
-    mems_og = set(info['mems'])
-    og_dict[name_og]['anc_og'] = []
-    node_intersection = []
-    max_dist = t.get_distance(t,name_og, topology_only=True)
-    og_dict[name_og]['dist'] = max_dist
-
-    #save all og with shared members
-    for n, i in og_dict.items():
-        og2compare = set(i['mems'])
-        if mems_og.intersection(og2compare):
-            node_intersection.append(n)
-
-    #get distance from node with shared memers to root
-    save_dups = defaultdict()
-    for node in node_intersection:
-        root2node = t.get_distance(t,node, topology_only=True)
-        if root2node < max_dist:
-            save_dups[node] = root2node
-    sort_dups = {k: v for k, v in sorted(save_dups.items(), key=lambda item: item[1] ,reverse = True)}
-    prev_og = defaultdict(dict)
-
-    if len(sort_dups) > 0:
-        
-        for og_anc, dist in sort_dups.items():
-            og_anc_node = t.search_nodes(name=og_anc)[0]
-            lca = og_anc_node.props.get('lca_node')
-            prev_og[og_anc]['dist'] = dist
-            prev_og[og_anc]['lca'] = lca
-
-        og_dict[name_og]['anc_og'] = prev_og
-        
-    else:
-        root_node = t.get_tree_root()
-        root_lca = root_node.props.get('lca_node')
-        prev_og[root_node.name]['dist'] = 0.0
-        prev_og[root_node.name]['lca'] = root_lca
-        og_dict[root_node.name]['anc_og'] = prev_og
-        
+#print(og_dict)
 og_mems_out = path_out+'/'+name_tree+'_mems.json'
 with open(og_mems_out, 'w') as f:
     json.dump(og_dict, f, indent=2)
+
+
+# for name_og, info in og_dict.items():
+    # mems_og = set(info['mems'])
+    # og_dict[name_og]['anc_og'] = []
+    # node_intersection = []
+    # max_dist = t.get_distance(t,name_og, topology_only=True)
+    # og_dict[name_og]['dist'] = max_dist
+
+    # #save all og with shared members
+    # for n, i in og_dict.items():
+        # og2compare = set(i['mems'])
+        # if mems_og.intersection(og2compare):
+            # node_intersection.append(n)
+
+    # #get distance from node with shared memers to root
+    # save_dups = defaultdict()
+    # for node in node_intersection:
+        # root2node = t.get_distance(t,node, topology_only=True)
+        # if root2node < max_dist:
+            # save_dups[node] = root2node
+    # sort_dups = {k: v for k, v in sorted(save_dups.items(), key=lambda item: item[1] ,reverse = True)}
+    # prev_og = defaultdict(dict)
+
+    # if len(sort_dups) > 0:
+        
+        # for og_anc, dist in sort_dups.items():
+            # og_anc_node = t.search_nodes(name=og_anc)[0]
+            # lca = og_anc_node.props.get('lca_node')
+            # prev_og[og_anc]['dist'] = dist
+            # prev_og[og_anc]['lca'] = lca
+
+        # og_dict[name_og]['anc_og'] = prev_og
+        
+    # else:
+        # root_node = t.get_tree_root()
+        # root_lca = root_node.props.get('lca_node')
+        # prev_og[root_node.name]['dist'] = 0.0
+        # prev_og[root_node.name]['lca'] = root_lca
+        # og_dict[root_node.name]['anc_og'] = prev_og
+        
+# og_mems_out = path_out+'/'+name_tree+'_mems.json'
+# with open(og_mems_out, 'w') as f:
+    # json.dump(og_dict, f, indent=2)
+
+
 
 _t3.stop()
 
