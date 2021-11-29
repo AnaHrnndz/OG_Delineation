@@ -250,7 +250,7 @@ def percentage_losses(node):
 
 
 #FUNCTIONS TO DETECT OUTLIERS
-def outliers_detection(n):
+def outliers_detection(n, outliers_node, outliers_reftree):
    
     #count_lin : Count for each taxid how many seqs (Bilateria is level 6 -> {6:{33213:x}})
     count_lin = defaultdict(int)
@@ -297,7 +297,7 @@ def outliers_detection(n):
             # 2. Also there has to be few representatives from reftree at that taxonomic level, those leaves will be remove     
             #   (in the node there are 2 porifera species but in reftree there are 2000 porifera species)
             # 3. Taxonomic level that are rare in reftree, will be preserved
-        if per_Egg <0.05 and per_Node < 0.01:
+        if per_Egg < outliers_reftree and per_Node < outliers_node:
             sp2remove.update(sp_per_level[tax])
                     
     return sp2remove
@@ -373,6 +373,9 @@ parser.add_argument('--output_path', dest='out_path', required=True)
 parser.add_argument('--species_overlap_euk', dest = 'so_euk' , default=0.2, type = float)
 parser.add_argument('--species_overlap_bact', dest = 'so_bact' , default=0.2, type = float)
 parser.add_argument('--species_overlap_arq', dest = 'so_arq' , default=0.2, type = float)
+parser.add_argument('--outliers_in_node', dest = 'outliers_node' , default=0.01, type = float)
+parser.add_argument('--outliers_in_reftree', dest = 'outliers_reftree' , default=0.05, type = float)
+parser.add_argument('--species_losses_perct', dest = 'sp_loss_perc' , default=0.9, type = float)
 parser.add_argument('--midpoint', dest='midpoint', required=True, choices=['yes', 'no'])
 parser.add_argument('--taxonomy', dest='taxonomy', default='/home/plaza/projects/eggnog6/pfamA_families/eggnog_experiments/data/levels2numSp.json')
 parser.add_argument('--reftree', dest='reftree', default='/home/plaza/projects/eggnog6/pfamA_families/eggnog_experiments/data/totalNCBITree.nw')
@@ -388,6 +391,9 @@ rtree = args.reftree
 so_euk = args.so_euk
 so_bact = args.so_bact
 so_arq = args.so_arq
+outliers_node = args.outliers_node
+outliers_reftree = args.outliers_reftree
+sp_loss_perc = args.sp_loss_perc
 
 #timers
 total_time = Timer("Total")
@@ -480,6 +486,12 @@ _t0.stop()
 
 
 print('\n'+'DETECT OUTLIERS AND DUPS SCORE FUNCTION')
+print('\t'+'--Outliers threshodls:')
+print('\t'+'\t'+'--Node: '+ str(outliers_node))
+print('\t'+'\t'+'--Reftree: '+ str(outliers_reftree))
+print('\t'+'--Species losses percentage threshold: ' + str(sp_loss_perc))
+
+
 _t1.start()
 root_name = t.name
 t.add_prop('is_root', 'True')
@@ -519,9 +531,9 @@ for n in t.traverse("preorder"):
         _t6.start()
         
         ch1 = n.children[0]
-        sp_out.update(outliers_detection(ch1))
+        sp_out.update(outliers_detection(ch1, outliers_node, outliers_reftree))
         ch2 = n.children[1]
-        sp_out.update(outliers_detection(ch2))
+        sp_out.update(outliers_detection(ch2, outliers_node, outliers_reftree))
         _t6.stop()
 
 
@@ -611,7 +623,7 @@ for n in t.traverse("preorder"):
         _t7.start()
         percentage_losses(n)
         _t7.stop()
-        if float(n.props.get('species_losses_percentage')[0]) >0.9 and float(n.props.get('species_losses_percentage')[1]) >0.9:
+        if float(n.props.get('species_losses_percentage')[0]) > sp_loss_perc and float(n.props.get('species_losses_percentage')[1]) > sp_loss_perc:
             n.add_prop('evoltype_2', 'FD')
 
         _t8.start()
@@ -630,6 +642,11 @@ total_mems_in_ogs = set()
 
 #Traverse tree to find the nodes that are "good" duplications and generate OGs.
 print('\n'+'ITER DUPS')
+print('\t'+'--species overlap used:')
+print('\t'+'\t'+'--Euk: '+ str(so_euk))
+print('\t'+'\t'+'--Bact :' + str(so_bact))
+print('\t'+'\t'+'--Arq :' + str(so_arq))
+
 for node in t.traverse("preorder"):
 
     lin2check = node.props.get('lineage')
