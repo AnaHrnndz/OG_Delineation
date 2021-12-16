@@ -1,4 +1,4 @@
-from ete4 import  PhyloTree, SeqGroup
+from ete4 import  PhyloTree, SeqGroup, Tree
 from ete4 import NCBITaxa
 from ete4.treeview import random_color
 from collections import Counter, OrderedDict, defaultdict
@@ -12,6 +12,7 @@ import random
 import time
 import argparse
 import warnings
+import pickle
 from django.utils.crypto import get_random_string
 
 warnings.filterwarnings("ignore", category=RuntimeWarning) 
@@ -124,11 +125,12 @@ def load_node_scores(n):
     nspcs = len(set(leaf_targets))   
     
     dups_per_sp = Counter(leaf_targets)
-    n.add_prop('inparalogs_rate', np.median(list(dups_per_sp.values())))    
+    inparalogs_rate = np.median(list(dups_per_sp.values()))
+    n.add_prop('inparalogs_rate', str(inparalogs_rate))    
     
     nseqs = len(n.props.get('_leaves_in'))    
-    n.add_prop('score1', (nspcs/SPTOTAL)) 
-    n.add_prop('score2', nspcs/nseqs if nseqs else 0.0)
+    n.add_prop('score1', float(nspcs/SPTOTAL)) 
+    n.add_prop('score2', float(nspcs/nseqs) if nseqs else 0.0)
 
 
 
@@ -175,9 +177,9 @@ def get_dup_score(n):
         return 0
 
     a = np.array([len(sp1), len(sp2)]) 
-    minval = np.min(a[np.nonzero(a)])
+    minval = int(np.min(a[np.nonzero(a)]))
 
-    dup_score = len(sp1 & sp2) / minval
+    dup_score = float(len(sp1 & sp2) / minval)
     
     return dup_score
 
@@ -198,12 +200,16 @@ def count_lineage_losses(expected_sp, found_sp):
     root = reftree.get_common_ancestor(expected_sp)
 
     losses = 0
-    lin_losses = []
-    for node in root.traverse(is_leaf_fn=is_leaf_2):
-        lin_losses.append(node.props.get('taxid'))
-        losses += 1
+    lin_losses = set()
+    #for node in root.traverse(is_leaf_fn=is_leaf_2):
+    for leaf in root.iter_leaves(is_leaf_fn=is_leaf_2):
+        losses +=1
+        
+        # Encontrar los linajes perdidos ralentiza mucho el script
+        #anc = get_lca_node(leaf.get_leaf_names())
+        #lin_losses.add(anc)
     
-    return losses, lin_losses
+    return int(losses), lin_losses
 
 def losses(node):
 
@@ -214,6 +220,7 @@ def losses(node):
         losses1, lin_losses1 = count_lineage_losses(expected_sp=sp1|sp2, found_sp=sp1)
         losses2, lin_losses2= count_lineage_losses(expected_sp=sp1|sp2, found_sp=sp2)
         node.add_prop('num_lineage_losses', [losses1, losses2])
+        node.add_prop('_taxid_lineage_losses', [lin_losses1, lin_losses2])
         
 
 
@@ -226,7 +233,7 @@ def count_species_losses(expected_sp, found_sp):
     losses = len(root) - len(found_sp)
     per_loss = losses / len(root)
     
-    return losses, per_loss
+    return int(losses), float(per_loss)
 
 
 def percentage_losses(node):
@@ -241,7 +248,7 @@ def percentage_losses(node):
         losses1, per_loss1 = count_species_losses(expected_sp=sp1|sp2, found_sp=sp1)
         losses2, per_loss2 = count_species_losses(expected_sp=sp1|sp2, found_sp=sp2) 
         node.add_prop('species_losses', [losses1, losses2])
-        node.add_prop('species_losses_percentage',[per_loss1, per_loss2])
+        node.add_prop('species_losses_percentage', [per_loss1, per_loss2])
 
     else:
         node.add_prop('species_losses', [0, 0])
@@ -346,19 +353,19 @@ def annotate_dups_ch(og_dict, total_mems_in_ogs, node, ch_node):
         if len(diff_sp) >=1:
             
             #miss_lin = defaultdict(list)
-            miss_lin = list()
+            miss_lin = set()
             for sp in diff_sp:
                 lin = ncbi.get_lineage(sp)
                 for l in lin:
                     if not l in ncbi.get_lineage(node.props.get('lca_node')): 
-                        miss_lin.append(l)
+                        miss_lin.add(l)
                         break
 
-            target_node.add_prop('miss_lineage', miss_lin)
-            target_node.add_prop('miss_sp', diff_sp)
+            target_node.add_prop('miss_lineage', list(miss_lin))
+            target_node.add_prop('_miss_sp', diff_sp)
            
         else:
-            target_node.add_prop('miss_lineage', '-')
+            target_node.add_prop('miss_lineage', list())
             
         total_mems_in_ogs.update(set(og_ch_mems))
 
@@ -368,6 +375,7 @@ print('\n'+'READ TREE, SEQ FILE, REF TREE')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--tree', dest='tree', required=True)
+parser.add_argument('--pickle_file', dest = 'pickle_file', choices=['yes', 'no'], default= 'no')
 parser.add_argument('--raw_fasta', dest='fasta', required=True)
 parser.add_argument('--output_path', dest='out_path', required=True)
 parser.add_argument('--species_overlap_euk', dest = 'so_euk' , default=0.2, type = float)
@@ -382,7 +390,14 @@ parser.add_argument('--reftree', dest='reftree', default='/home/plaza/projects/e
 parser.add_argument('--ncbitaxa', dest='ncbitaxa')
 args = parser.parse_args()
 
-t = PhyloTree(args.tree)
+
+if args.pickle_file == 'yes':
+    with open(args.tree, "rb") as handle:
+        t = pickle.load(handle)
+
+elif args.pickle_file == 'no':
+    t = PhyloTree(args.tree)
+
 name_tree = os.path.basename(args.tree)
 fasta = SeqGroup(args.fasta)
 path_out = args.out_path
@@ -426,16 +441,20 @@ with open(taxonomy) as levels:
 
 print('-Load reftree')
 reftree = PhyloTree(rtree)
+ncbi.annotate_tree(reftree,  taxid_attr="name")
 print('\t'+'Len reftree: ', len(reftree))
 
 
 print('\n'+'START PROCESSING TREE')
 t.resolve_polytomy()
 
+
+
 if  args.midpoint  and args.midpoint == "yes":
     print('-Midpoint rooting')
     midpoint = t.get_midpoint_outgroup()
-    t = t.set_outgroup(midpoint)
+    t.set_outgroup(midpoint)
+    
 
 # Parsing function used to extract species name from a node’s name.
 t.set_species_naming_function(lambda x: x.split('.')[0])
@@ -494,12 +513,13 @@ print('\t'+'--Species losses percentage threshold: ' + str(sp_loss_perc))
 
 _t1.start()
 root_name = t.name
-t.add_prop('is_root', 'True')
+t.add_prop('is_root', str('True'))
 t.add_prop('_all_mems', clean_string(str(list(total_mems_in_tree))))
 
 for n in t.traverse("preorder"):
 
     n.del_prop('named_lineage')
+    n.del_prop('_speciesFunction')
     
     sci_name = clean_string(n.props.get('sci_name'))
     n.add_prop('_sci_name', sci_name)
@@ -579,7 +599,7 @@ for n in t.traverse("preorder"):
         overlaped_spces = set(sp_ch1 & sp_ch2)
         if len(overlaped_spces)>0:
             so_score = float(len(overlaped_spces) / len(all_spcs))
-            n.add_prop('_overlap', overlaped_spces)
+            n.add_prop('_overlap', list(overlaped_spces))
         else:
             so_score = 0.0
         
@@ -629,6 +649,8 @@ for n in t.traverse("preorder"):
         _t8.start()
         losses(n)
         _t8.stop()
+
+        
         
 _t1.stop()
 
@@ -648,6 +670,8 @@ print('\t'+'\t'+'--Bact :' + str(so_bact))
 print('\t'+'\t'+'--Arq :' + str(so_arq))
 
 for node in t.traverse("preorder"):
+    n.del_prop('_speciesFunction')
+    
 
     lin2check = node.props.get('lineage')
     
@@ -766,7 +790,7 @@ _t5.start()
 # clean strings
 all_props = set()
 for n in t.traverse():
-    for string in ("sci_name", "lca_node_name"):
+    for string in ("sci_name", "lca_node_name", "common_name"):
         prop = n.props.get(string)
         if prop:
             n.props[string] = clean_string(prop)
@@ -774,8 +798,14 @@ for n in t.traverse():
 
 
 print('-Post tree')
+
+if args.pickle_file == 'yes':
+    with open(path_out+'/post_'+name_fam+'.pickle', "wb") as handle:
+        pickle.dump(t, handle)
+
 post_tree = path_out+'/'+'post_'+name_fam+'.nw'
 t.write(format=1, outfile=post_tree, properties=all_props)
+
 
 
 _t5.stop()  
