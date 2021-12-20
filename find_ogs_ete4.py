@@ -445,7 +445,7 @@ ncbi.annotate_tree(reftree,  taxid_attr="name")
 print('\t'+'Len reftree: ', len(reftree))
 
 
-print('\n'+'START PROCESSING TREE')
+print('\n'+'START PROCESSING TREE: '+name_tree)
 t.resolve_polytomy()
 
 

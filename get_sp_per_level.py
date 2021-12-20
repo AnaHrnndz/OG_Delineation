@@ -19,15 +19,14 @@ print(len(t))
 
 
 level2sp_mem = defaultdict(set)
-level2sp_num = defaultdict()
-
 for l in t:
     lin = l.lineage
-    lin_2 = ncbi.get_lineage(l.name)
     
     for tax in lin:
         level2sp_mem[tax].add(l.name)
-    
+
+
+level2sp_num = defaultdict()
 for taxid, mems in level2sp_mem.items():
     level2sp_num[taxid] = len(mems)
 
