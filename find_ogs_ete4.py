@@ -429,7 +429,7 @@ _t0.start()
 print('-Load taxonomy:  ')
 if args.ncbitaxa:
     print('\t'+os.path.dirname(os.path.abspath(args.ncbitaxa)))
-    ncbi = NCBITaxa(args.ncbitaxa)
+    ncbi = NCBITaxa(args.ncbitaxa, memory = True)
 else:
     ncbi = NCBITaxa()
 
