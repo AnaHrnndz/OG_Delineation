@@ -605,7 +605,8 @@ for n in t.traverse("preorder"):
         
         #Calculate common ancestor and rank for the species included in that node
         if len(sp_in) > 0:
-            lca_node = get_lca_node(sp_in)
+            #lca_node = get_lca_node(sp_in)
+            lca_node = ncbi.get_topology(list(sp_in)).props.get('taxid')
             rank = ncbi.get_rank([lca_node])[lca_node]
             lin_lca = ncbi.get_lineage(lca_node)
             n.add_prop('lineage', lin_lca)
