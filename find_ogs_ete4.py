@@ -804,7 +804,7 @@ if args.pickle_file == 'yes':
         pickle.dump(t, handle)
 
 post_tree = path_out+'/'+'post_'+name_fam+'.nw'
-t.write(format=1, outfile=post_tree, properties=all_props)
+t.write(format=1, outfile=post_tree, properties=all_props, format_root_node = True)
 
 
 
