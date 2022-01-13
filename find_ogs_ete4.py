@@ -630,7 +630,17 @@ for n in t.traverse("preorder"):
         n.add_prop('_leaves_out', list(leaves_out))
         n.add_prop('so_score', so_score)
 
-        if so_score > 0:
+
+        if 2 in lin_lca:
+            so_in_use = so_bact
+        elif 2759 in lin_lca:
+            so_in_use = so_euk
+        elif 2157 in lin_lca:
+            so_in_use = so_arq
+        else:
+            so_in_use = 0.2
+
+        if so_score > so_in_use:
             n.add_prop('evoltype_2', 'D')
         else:
             n.add_prop('evoltype_2', 'S')
