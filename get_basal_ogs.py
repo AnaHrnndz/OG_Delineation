@@ -17,12 +17,12 @@ target_level = sys.argv[2]
 
 
 t = PhyloTree(sys.argv[3], format = 1)
-t.set_species_naming_function(lambda x: x.split('.')[0])
-ncbi.annotate_tree(t,  taxid_attr="species")
+# t.set_species_naming_function(lambda x: x.split('.')[0])
+# ncbi.annotate_tree(t,  taxid_attr="species")
 
 for name_og, info in og_dict.items():
     mems_og = set(info['mems'])
-    og_dict[name_og]['anc_og'] = []
+    og_dict[name_og]['anc_og'] = defaultdict(dict)
     node_intersection = []
     max_dist = t.get_distance(t,name_og, topology_only=True)
     og_dict[name_og]['dist'] = max_dist
@@ -40,8 +40,8 @@ for name_og, info in og_dict.items():
         if root2node < max_dist:
             save_dups[node] = root2node
     sort_dups = {k: v for k, v in sorted(save_dups.items(), key=lambda item: item[1] ,reverse = True)}
+    
     prev_og = defaultdict(dict)
-
     if len(sort_dups) > 0:
         
         for og_anc, dist in sort_dups.items():
@@ -61,7 +61,8 @@ for name_og, info in og_dict.items():
 
 
 
-
+#OG_levels : save og at target level
+#save_dups : save dups that contain target level in lineage
 save_dups = {}
 og_level = {}
 for og, val in og_dict.items():
@@ -74,7 +75,8 @@ for og, val in og_dict.items():
         
 sort_dups = {k: v for k, v in sorted(save_dups.items(), key=lambda item: item[1])}
 
-print(og_level)
+
+
 for og, dist in sort_dups.items():
     if not set(og_level.keys()).intersection(set(og_dict[og]["anc_og"].keys())):
         og_level[og] = [og_dict[og]["dist"], len(og_dict[og]["mems"])]
@@ -84,6 +86,8 @@ f_out_name = os.path.basename(sys.argv[1]).split('.')[0]+'_OGs_'+str(target_leve
 with open(f_out_name, 'w') as out:
     json.dump(og_level, out)
 
+
+print(og_level)
 print(len(og_level))
 mems_in_ogs = set()
 total_mems = set()
