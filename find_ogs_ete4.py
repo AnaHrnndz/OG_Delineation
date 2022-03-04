@@ -380,46 +380,56 @@ def annotate_dups_ch(og_dict, total_mems_in_ogs, node, ch_node):
         total_mems_in_ogs.update(set(og_ch_mems))
 
 
-print('\n'+'READ TREE, SEQ FILE, REF TREE')
+
+if __name__ == "__main__":
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--tree', dest='tree', required=True)
-parser.add_argument('--pickle_file', dest = 'pickle_file', choices=['yes', 'no'], default= 'no')
-parser.add_argument('--raw_fasta', dest='fasta', required=True)
-parser.add_argument('--output_path', dest='out_path', required=True)
-parser.add_argument('--species_overlap_euk', dest = 'so_euk' , default=0.2, type = float)
-parser.add_argument('--species_overlap_bact', dest = 'so_bact' , default=0.2, type = float)
-parser.add_argument('--species_overlap_arq', dest = 'so_arq' , default=0.2, type = float)
-parser.add_argument('--outliers_in_node', dest = 'outliers_node' , default=0.01, type = float)
-parser.add_argument('--outliers_in_reftree', dest = 'outliers_reftree' , default=0.05, type = float)
-parser.add_argument('--species_losses_perct', dest = 'sp_loss_perc' , default=0.9, type = float)
-parser.add_argument('--midpoint', dest='midpoint', required=True, choices=['yes', 'no'])
-parser.add_argument('--taxonomy', dest='taxonomy', default='/home/plaza/projects/eggnog6/pfamA_families/eggnog_experiments/data/levels2numSp.json')
-parser.add_argument('--reftree', dest='reftree', default='/home/plaza/projects/eggnog6/pfamA_families/eggnog_experiments/data/totalNCBITree.nw')
-parser.add_argument('--ncbitaxa', dest='ncbitaxa')
-args = parser.parse_args()
+    print('\n'+'READ TREE, SEQ FILE, REF TREE')
 
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tree', dest='tree', required=True)
+    parser.add_argument('--pickle_file', dest = 'pickle_file', choices=['yes', 'no'], default= 'no')
+    parser.add_argument('--raw_fasta', dest='fasta', required=True)
+    parser.add_argument('--output_path', dest='out_path', required=True)
+    parser.add_argument('--species_overlap_euk', dest = 'so_euk' , default=0.2, type = float)
+    parser.add_argument('--species_overlap_bact', dest = 'so_bact' , default=0.2, type = float)
+    parser.add_argument('--species_overlap_arq', dest = 'so_arq' , default=0.2, type = float)
+    parser.add_argument('--outliers_in_node', dest = 'outliers_node' , default=0.01, type = float)
+    parser.add_argument('--outliers_in_reftree', dest = 'outliers_reftree' , default=0.05, type = float)
+    parser.add_argument('--species_losses_perct', dest = 'sp_loss_perc' , default=0.9, type = float)
+    parser.add_argument('--midpoint', dest='midpoint', required=True, choices=['yes', 'no'])
+    parser.add_argument('--taxonomy', dest='taxonomy', default='/home/plaza/projects/eggnog6/pfamA_families/eggnog_experiments/data/levels2numSp.json')
+    parser.add_argument('--reftree', dest='reftree', default='/home/plaza/projects/eggnog6/pfamA_families/eggnog_experiments/data/totalNCBITree.nw')
+    parser.add_argument('--ncbitaxa', dest='ncbitaxa')
+    args = parser.parse_args()
 
-if args.pickle_file == 'yes':
-    with open(args.tree, "rb") as handle:
-        t = pickle.load(handle)
 
-elif args.pickle_file == 'no':
-    t = PhyloTree(args.tree)
+    if args.pickle_file == 'yes':
+        with open(args.tree, "rb") as handle:
+            t = pickle.load(handle)
 
-name_tree = os.path.basename(args.tree)
-fasta = SeqGroup(args.fasta)
-path_out = args.out_path
-taxonomy = args.taxonomy
-rtree = args.reftree
-so_euk = args.so_euk
-so_bact = args.so_bact
-so_arq = args.so_arq
-outliers_node = args.outliers_node
-outliers_reftree = args.outliers_reftree
-sp_loss_perc = args.sp_loss_perc
+    elif args.pickle_file == 'no':
+        t = PhyloTree(args.tree)
+
+    name_tree = os.path.basename(args.tree)
+    fasta = SeqGroup(args.fasta)
+    path_out = args.out_path
+    taxonomy = args.taxonomy
+    rtree = args.reftree
+    so_euk = args.so_euk
+    so_bact = args.so_bact
+    so_arq = args.so_arq
+    outliers_node = args.outliers_node
+    outliers_reftree = args.outliers_reftree
+    sp_loss_perc = args.sp_loss_perc
+
+    # Call functions
+    t = annotate_tre()
+    
+    ..
+    ..
+
 
 #timers
 total_time = Timer("Total")
