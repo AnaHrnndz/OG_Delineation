@@ -105,6 +105,7 @@ def run_preanalysis_annot_tree(t, name_tree):
     total_mems_in_tree = set()
     for n in t.traverse("preorder"):
         if n.is_leaf():
+            
             total_mems_in_tree.add(n.name)
             sp_set.add(n.props.get('taxid'))
 
@@ -176,6 +177,7 @@ def get_og_info(t):
     total_mems_in_ogs = set()
 
     for node in t.traverse():
+        
         if node.props.get('node_is_og') and not node.is_root():
             
             
@@ -240,7 +242,8 @@ def get_lca_node(sp_list, taxonomy_db):
     lca = [l for l, count in lineages.items() if count == nspecies]
     if not lca:
         lca = ['Unk']
-    return lca[-1]
+    
+    return lca[-1], lca
 
 
 
@@ -364,12 +367,14 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT, taxonomy_cou
 
     for l in CONTENT[n]:
         sp_in_node.add(l.props.get('taxid'))
-        for index, tax in enumerate(l.props.get('lineage')):
+        #print(l.props.get('lineage'))
+        for index, tax in enumerate(l.props.get('lineage').split('|')):
+            
             count_lin[tax] += 1
             sp_per_level[tax].add(str(l.props.get('taxid')))
-                
+      
     sp2remove = set()
-        
+    
     # Detect outliers for each taxid from lineages
     for tax, num in count_lin.items():
         #num = How many sp there are at that taxonomic level in the node 
@@ -382,6 +387,8 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT, taxonomy_cou
         
         #% lineage in the node
         per_Node = num / len(sp_in_node)
+        
+        #print(tax, num, len(sp_in_node), per_Node)
        
         #% linege in tree
         #per_Tree = num / global_linages[level][tax]
@@ -389,6 +396,8 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT, taxonomy_cou
         
         #% lineage in reftree
         per_Egg = num / taxonomy_counter.get(str(tax), 2)
+        per_Egg = num / taxonomy_counter[int(tax)]
+        
         #per_Egg_total = levels_eggnog[str(tax)] / len(reftree)
     
         # If % of sp in the node at that taxonomic level is below 1%  and % of sp in reftree is below 5%, remove that species, that means:
@@ -398,7 +407,8 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT, taxonomy_cou
             # 3. Taxonomic level that are rare in reftree, will be preserved
         if per_Egg < outliers_reftree and per_Node < outliers_node:
             sp2remove.update(sp_per_level[tax])
-                    
+
+   
     return sp2remove
 
 
@@ -420,6 +430,24 @@ def run_load_tree(tree=None):
     else:
         print('\t'+'FORMAT string')
         t = PhyloTree(tree, format = 0)
+
+    return t
+
+
+def run_load_annotated_tree(tree=None):
+    print('-Load tree: ')
+    if os.path.basename(tree).split('.')[-1] == 'pickle': 
+        with open(args.tree, "rb") as handle:
+            print('\t'+'FORMAT PICKLE')
+            t = pickle.load(handle)
+
+    elif os.path.basename(tree).split('.')[-1] == 'nw': 
+        print('\t'+'FORMAT NEWICK')
+        t = PhyloTree(args.tree)
+
+    else:
+        print('\t'+'FORMAT string')
+        t = PhyloTree(tree, format = 1)
 
     return t
 
@@ -506,7 +534,7 @@ def run_preanalysis(t, name_tree, taxonomy_db, midpoint):
             #Create an ID for each internal node
             name = id_generator()
             n.add_prop('name', name)
-            print(n.support)
+            
 
         else:
             total_mems_in_tree.add(n.name)
@@ -569,13 +597,14 @@ def run_outliers_dup_score(t, outliers_node, outliers_reftree, sp_loss_perc, so_
             leaves_out = set()
             sp_in = set()
             leaves_in = set()
-
+           
             #Add outliers from upper nodes
             sp_out_up = set()
             if n.up and n.up.props.get('sp_out'):
                 sp_out_up = n.up.props.get('sp_out')
                 for sp in sp_out_up:
-                    if int(sp) in [leaf.props.get('taxid') for leaf in CONTENT[n]]:
+                    if (sp) in [leaf.props.get('taxid') for leaf in CONTENT[n]]:
+                       
                         sp_out.add(sp)
 
 
@@ -589,7 +618,6 @@ def run_outliers_dup_score(t, outliers_node, outliers_reftree, sp_loss_perc, so_
             sp_out.update(outliers_detection(ch2, outliers_node, outliers_reftree, CONTENT, taxonomy_counter))
            # _t3.stop()
 
-            
             if len(sp_out) > 0:
                 all_leafs = CONTENT[n]
                 for l in all_leafs:
@@ -639,8 +667,7 @@ def run_outliers_dup_score(t, outliers_node, outliers_reftree, sp_loss_perc, so_
             #_t7.start()
             #Calculate common ancestor and rank for the species included in that node
             if len(sp_in) > 0:
-                lca_node = get_lca_node(sp_in, taxonomy_db)
-                #lca_node = taxonomy_db.get_topology(list(sp_in)).props.get('taxid')
+                lca_node , lca_total= get_lca_node(sp_in, taxonomy_db)
                 rank = clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
                 lin_lca = taxonomy_db.get_lineage(lca_node)
                 n.add_prop('lineage', lin_lca)
