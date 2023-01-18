@@ -1340,7 +1340,7 @@ def expand_hmm(best_match, ogs_info):
             # new_l.append(seq_name)
             # total_seqs.add(seq_name)
             # og_info_recovery[name_best_og]['ogs_mems'] = new_l
-    
+    print('BB', type(og_info_recovery))
     return og_info_recovery, total_recovery_seqs
         
 
@@ -1370,6 +1370,7 @@ def update_og_info(og_info, og_info_recovery):
         info['ogs_mems'] = str2set
         
         
+    
     
     for og, recover_seqs in og_info_recovery.items():
         
@@ -1602,7 +1603,8 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
         #og_info_recovery = og_name : recover_seqs
         og_info_recovery, recovery_seqs = expand_hmm(best_match, ogs_info)
         recovery_seqs = set(best_match.keys())
-
+        
+        
         og_info_updated = update_og_info(ogs_info, og_info_recovery)
 
         total_mems_in_ogs.update(recovery_seqs)
