@@ -18,6 +18,10 @@ import glob
 import subprocess
 from django.utils.crypto import get_random_string
 import csv
+import tarfile
+import os
+import shutil
+
 sys.path.append('/data/projects/og_delineation_web/bin')
 
 warnings.filterwarnings("ignore", category=RuntimeWarning) 
@@ -103,7 +107,10 @@ def id_generator():
     id_ = get_random_string(length=12)
     return id_
 
-
+def make_tarfile(output_filename, source_dir):
+    print('CCCCC', output_filename, source_dir)
+    with tarfile.open(output_filename, "w:gz") as tar:
+        tar.add(source_dir, arcname=os.path.basename(source_dir))
 
 #FUNCTIONS FOR OG DELINEATION WEB
 def run_preanalysis_annot_tree(t, name_tree):
@@ -1482,7 +1489,8 @@ def get_seq2og(t, best_match):
 
 def write_seq2ogs(seq2ogs, path):
 
-    seq2ogs_out = open(path+'/seq2ogs.tsv', 'w')
+    name_fam = os.path.basename(args.tree).split('.')[0]
+    seq2ogs_out = open(path+'/'+name_fam+'.seq2ogs.tsv', 'w')
     for seq, ogs in seq2ogs.items():
         ogs_out = list()
         for taxlev, og_name in ogs.items():
@@ -1495,11 +1503,13 @@ def write_seq2ogs(seq2ogs, path):
 
 def write_ogs_info(ogs_info, pipeline ,path):
 
+
+    name_fam = os.path.basename(args.tree).split('.')[0]
     if pipeline == 'recovery':
-        name_out =  path+'/recovery_ogs_info.tsv'
+        name_out =  path+'/'+name_fam+'.recovery_ogs_info.tsv'
        
     elif pipeline == 'original':
-        name_out = path+'/original_ogs_info.tsv'
+        name_out = path+'/'+name_fam+'.original_ogs_info.tsv'
        
     with open(name_out, "w",  newline='') as myfile:
         w = csv.writer(myfile, delimiter='\t')
@@ -1582,7 +1592,9 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
 
     #If aln, run recovery pipeline
     if args.alg:
-        pathout = path_out+'/aln_hmm'
+
+        name_fam = os.path.basename(args.tree).split('.')[0]
+        pathout = path_out+'/'+name_fam+'_aln_hmm'
         if not os.path.exists(pathout):
             os.mkdir(pathout)
         fasta = args.alg
@@ -1625,6 +1637,10 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
 
         t, all_props = run_clean_properties(t)
         run_write_post_tree(t, name_tree, path_out, all_props)
+
+        output_filename = path_out+'/'+name_fam+'.tar.gz'
+        make_tarfile(output_filename, pathout)
+        shutil.rmtree(pathout)
                        
     else:
         #Clean properties & Write post_tree
