@@ -606,9 +606,9 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT_, taxonomy_co
 
 
 #Add propeties to the root node
-def annotate_root(ogs_info, node, taxonomy_db, total_mems_in_tree, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org,so_arq, so_bact, so_euk):
+def annotate_root(ogs_info, node, taxonomy_db, total_mems_in_tree, total_mems_in_ogs,outliers_node, outliers_reftree, sp_loss_perc, so_cell_org,so_arq, so_bact, so_euk):
     name = node.props.get('name')
-    node.add_prop('node_is_og', 'True')
+    #node.add_prop('node_is_og', 'True')
     node.add_prop('so_score_dup', node.props.get('so_score'))
     node.add_prop('dup_lineage', list(taxonomy_db.get_lineage(node.props.get('lca_node'))))
     node.add_prop('_mems_og', total_mems_in_tree)
@@ -622,6 +622,40 @@ def annotate_root(ogs_info, node, taxonomy_db, total_mems_in_tree, outliers_node
     node.add_prop("so_arq", so_arq)
     node.add_prop("so_bact", so_bact)
     node.add_prop("so_euk", so_euk)
+
+    if len(ogs_info.keys()) == 0:
+        node.add_prop('node_is_og', 'True')
+        ogs_info[name]["name_dup"] = node.props.get("name")
+        ogs_info[name]["lca_dup"] = node.props.get("lca_node")
+        ogs_info[name]["lca_dup_lineage"] = node.props.get("lineage")
+        ogs_info[name]["tax_scope_og"] = node.props.get("lca_node")
+        ogs_info[name]["ogs_mems"] = node.props.get("_mems_og")
+        ogs_info[name]["total_leaves"] = node.props.get('total_leaves')
+        ogs_info[name]["num_sp_OGs"] = node.props.get('len_sp_in')
+        ogs_info[name]["num_sp_out"] = node.props.get('sp_out','0')
+        ogs_info[name]['recovery_mems'] = set()
+        total_mems_in_ogs.update(set(node.props.get("_mems_og")))
+        # ogs_info[name]['ogs_up'] = '-'
+        # ogs_info[name]['dups_up'] = '-'
+
+    lca_all_dups = set()
+    for og, info in ogs_info.items():
+        lca_all_dups.add(info['lca_dup'])
+    if  node.props.get('lca_node') not in lca_all_dups:
+        node.add_prop('node_is_og', 'True')
+        ogs_info[name]["name_dup"] = node.props.get("name")
+        ogs_info[name]["lca_dup"] = node.props.get("lca_node")
+        ogs_info[name]["lca_dup_lineage"] = node.props.get("lineage")
+        ogs_info[name]["tax_scope_og"] = node.props.get("lca_node")
+        ogs_info[name]["ogs_mems"] = node.props.get("_mems_og")
+        ogs_info[name]["total_leaves"] = node.props.get('total_leaves')
+        ogs_info[name]["num_sp_OGs"] = node.props.get('len_sp_in')
+        ogs_info[name]["num_sp_out"] = node.props.get('sp_out','0')
+        ogs_info[name]['recovery_mems'] = set()
+        total_mems_in_ogs.update(set(node.props.get("_mems_og")))
+        # ogs_info[name]['ogs_up'] = '-'
+        # ogs_info[name]['dups_up'] = '-'
+
 
     node.add_prop("OGD_annot", True)
     
@@ -1031,8 +1065,8 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
 
         node.add_prop('min_sp_overlap', so_2_use)
 
-        if node.is_root():
-            annotate_root(ogs_info, node, taxonomy_db, total_mems_in_tree, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org, so_arq, so_bact, so_euk)
+        #if node.is_root():
+        #    annotate_root(ogs_info, node, taxonomy_db, total_mems_in_tree, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org, so_arq, so_bact, so_euk)
 
         if not node.is_leaf() and node.props.get('evoltype_2') == 'D' and so_2_use <= float(node.props.get('so_score')) \
         and len(node.props.get('_leaves_in')) >1 and len(node.props.get('_sp_in')) > 1 :\
@@ -1047,8 +1081,6 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
 
             #There are more dups under the node
             if len(dups_under_node) > 0:
-                
-                
                 
                 lca_target = node.props.get('lca_node')
 
@@ -1070,10 +1102,6 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
                             save_dups_ch1[n_.name] = root2node
                             
 
-                   
-                
-                            
-
                 if len(dups_under_ch2)> 0:
                     for n_ in  dups_under_ch2:
                         if float(n_.props.get('so_score'))>= so_2_use  \
@@ -1092,9 +1120,6 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
                 if len(save_dups_ch2) == 0 :
                     annotate_dups_ch(ogs_info, total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
                    
-
-                   
-
 
 
             # No more dups under node with the same lca_node
@@ -1129,13 +1154,13 @@ def add_ogs_up_down(t, ogs_info):
                 dups_down.append(n.up.name)
         
         if len(ogs_down) > 0:
-            if node.props.get('node_is_og') and not node.props.get('is_root'):
+            if node.props.get('node_is_og'):#and not node.props.get('is_root'):
                 ogs_info[node_name]['ogs_down'] = ','.join(list(ogs_down))
                 ogs_info[node_name]['dups_down'] = dups_down
             node.add_prop('_ogs_down',ogs_down)
             node.add_prop('_dups_down', dups_down)
         else:
-            if node.props.get('node_is_og') and not node.props.get('is_root'):
+            if node.props.get('node_is_og'):# and not node.props.get('is_root'):
                 ogs_info[node_name]['ogs_down'] = '-'
                 ogs_info[node_name]['dups_down'] = '-'
         
@@ -1145,13 +1170,13 @@ def add_ogs_up_down(t, ogs_info):
         ogs_up, dups_up = check_nodes_up(node)
         
         if len(ogs_up) > 0:
-            if node.props.get('node_is_og') and not node.props.get('is_root'):
+            if node.props.get('node_is_og'): #and not node.props.get('is_root'):
                 ogs_info[node_name]['ogs_up'] = ','.join(list(ogs_up))
                 ogs_info[node_name]['dups_up'] = dups_up
             node.add_prop('_ogs_up', ogs_up)
             node.add_prop('_dups_up', dups_up)
         else:
-            if node.props.get('node_is_og') and not node.props.get('is_root'):
+            if node.props.get('node_is_og'): #and not node.props.get('is_root'):
                 ogs_info[node_name]['ogs_up'] = '-'
                 ogs_info[node_name]['dups_up'] = '-'
     
@@ -1461,7 +1486,7 @@ def run_write_post_tree(t, name_tree, path_out, all_props):
     return
 
 
-def get_seq2og(t, best_match):
+def get_seq2og(t, best_match=dict()):
    
     seq2ogs = defaultdict(dict)
     nodes_total_leaves = t.get_leaves()
@@ -1479,11 +1504,23 @@ def get_seq2og(t, best_match):
         else:
             ogs_up, dups_up = check_nodes_up(l)
 
-
+        
         for n_up_name in ogs_up:
             n_up = t.search_nodes(name=n_up_name)[0]
             taxlev = n_up.props.get('lca_dup')
             seq2ogs[l.name][taxlev] = n_up_name
+
+        if t.props.get('node_is_og') == 'True':
+            lca_root = t.props.get('lca_node')
+            root_name = t.props.get('name')
+            seq2ogs[l.name][lca_root] = root_name
+
+    if len(seq2ogs) == 0:
+        for l in nodes_total_leaves:
+            lca_root = t.props.get('lca_node')
+            root_name = t.props.get('name')
+            seq2ogs[l.name][lca_root] = root_name
+
 
     return seq2ogs
 
@@ -1576,8 +1613,12 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
     t =  run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org,so_arq, so_bact, so_euk, CONTENT, taxonomy_counter, taxonomy_db, SPTOTAL, reftree, inherit_out)
 
     #Detect duplications and OGs
-    t, total_mems_in_ogs, ogs_info, taxid_dups_og   = run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org,so_arq, so_bact, so_euk, taxonomy_db, total_mems_in_tree)
+    t, total_mems_in_ogs, ogs_info, taxid_dups_og  = run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org,so_arq, so_bact, so_euk, taxonomy_db, total_mems_in_tree)
    
+    #Annotate root
+    annotate_root(ogs_info, t, taxonomy_db, total_mems_in_tree, total_mems_in_ogs, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org, so_arq, so_bact, so_euk)
+    print(ogs_info.keys())
+
     t, ogs_info = add_ogs_up_down(t, ogs_info)
     
   
@@ -1591,7 +1632,7 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
 
 
     #If aln, run recovery pipeline
-    if args.alg:
+    if args.alg and len(total_mems_in_tree.difference(total_mems_in_ogs)) > 0:
 
         name_fam = os.path.basename(args.tree).split('.')[0]
         pathout = path_out+'/'+name_fam+'_aln_hmm'
@@ -1646,7 +1687,7 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
         #Clean properties & Write post_tree
         seq2ogs = get_seq2og(t)
         write_seq2ogs(seq2ogs, path_out)
-        write_ogs_info(ogs_info, path_out)
+        write_ogs_info(ogs_info, 'original', path_out)
 
         t, all_props = run_clean_properties(t)
         run_write_post_tree(t, name_tree, path_out, all_props)
