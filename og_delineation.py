@@ -1025,6 +1025,7 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
 
 def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org, so_arq, so_bact, so_euk, taxonomy_db, total_mems_in_tree):
 
+    
     #t = PhyloTree(t_nw, format = 1)    
     #_t6.start()
     #ogs_info, save info of nodes that are OGs
@@ -1073,9 +1074,9 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
         #and len(node.props.get('_sp_in_ch1'))>= 1 and len(node.props.get('_sp_in_ch2'))>= 1:
 
             
-
             dups_under_node = []
             for n in node.search_nodes(evoltype_2='D'):
+            
                 if n.name!= node.name:
                     dups_under_node.append(n)
 
@@ -1083,11 +1084,13 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
             if len(dups_under_node) > 0:
                 
                 lca_target = node.props.get('lca_node')
+                
 
                 #Save Dups under child 1 and child2 that have the same lca_node
                 dups_under_ch1 = node.children[0].search_nodes(evoltype_2='D', lca_node=lca_target)
                 dups_under_ch2 = node.children[1].search_nodes(evoltype_2='D', lca_node=lca_target)
 
+            
                 save_dups_ch1 = defaultdict()
                 save_dups_ch2 = defaultdict()
 
@@ -1095,20 +1098,23 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
                 # more than 2 leaves and more than 2 species
                 if len(dups_under_ch1)> 0:
 
-                    for n_ in  dups_under_ch1:     
+                    for n_ in  dups_under_ch1:
+                        
                         if float(n_.props.get('so_score'))>= so_2_use \
-                        and len(n_.props.get('_leaves_ch1')) >1 and len(n_.props.get('_sp_in_ch1'))> 1 :  
+                        and len(n_.props.get('_leaves_in')) >1 and len(n_.props.get('_sp_in'))> 1 :  
                             root2node = node.get_distance(node, n_, topology_only=True)
                             save_dups_ch1[n_.name] = root2node
                             
+                
 
                 if len(dups_under_ch2)> 0:
                     for n_ in  dups_under_ch2:
                         if float(n_.props.get('so_score'))>= so_2_use  \
-                        and len(n_.props.get('_leaves_ch2'))>1 and len(n_.props.get('_sp_in_ch2'))> 1 :
+                        and len(n_.props.get('_leaves_in'))>1 and len(n_.props.get('_sp_in'))> 1 :
                             root2node = node.get_distance(node, n_, topology_only=True)
                             save_dups_ch2[n_.name] = root2node
                             
+                
 
                 #If dups under child1 do not achieve our requirement, then child1 is OG
                 if len(save_dups_ch1) == 0:
@@ -1117,7 +1123,7 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
                    
 
                 #If dups under child2 do not achieve our requirement, then child2 is OG
-                if len(save_dups_ch2) == 0 :
+                if len(save_dups_ch2) == 0 :    
                     annotate_dups_ch(ogs_info, total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
                    
 
@@ -1617,8 +1623,7 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
    
     #Annotate root
     annotate_root(ogs_info, t, taxonomy_db, total_mems_in_tree, total_mems_in_ogs, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org, so_arq, so_bact, so_euk)
-    print(ogs_info.keys())
-
+    
     t, ogs_info = add_ogs_up_down(t, ogs_info)
     
   
