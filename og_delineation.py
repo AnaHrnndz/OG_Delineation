@@ -261,38 +261,10 @@ def run_load_tree(tree=None):
     elif os.path.basename(tree).split('.')[-1] != 'pickle':
         t = PhyloTree(tree, format = 1)
 
-    # elif os.path.basename(tree).split('.')[-1] == 'nw': 
-        # print('\t'+'FORMAT: NEWICK')
-        # t = PhyloTree(args.tree)
-        # print(args.tree)
-
-    # elif isinstance(tree, str):
-        # print('\t'+'FORMAT: string format 1')
-        # t = PhyloTree(tree, format = 1)
-        # print(tree)
-
     else:
         print('\t'+'WRONG TREE FORMAT')
     
     return t
-
-
-# def run_load_annotated_tree(tree=None):
-    # print('-Load tree: ')
-    # if os.path.basename(tree).split('.')[-1] == 'pickle': 
-        # with open(args.tree, "rb") as handle:
-            # print('\t'+'FORMAT PICKLE')
-            # t = pickle.load(handle)
-
-    # elif os.path.basename(tree).split('.')[-1] == 'nw': 
-        # print('\t'+'FORMAT NEWICK')
-        # t = PhyloTree(args.tree)
-
-    # else:
-        # print('\t'+'FORMAT string')
-        # t = PhyloTree(tree, format = 1)
-
-    # return t
 
 
 def run_load_taxonomy(taxonomy=None, user_taxonomy=None):
@@ -305,6 +277,7 @@ def run_load_taxonomy(taxonomy=None, user_taxonomy=None):
         else:
             taxonomy_db = NCBITaxa(memory = True)
     
+    #Not tested 
     elif taxonomy == 'GTDB':
         if user_taxonomy != None:
             print('\t'+os.path.dirname(os.path.abspath(user_taxonomy)))
@@ -327,7 +300,6 @@ def run_load_reftree(rtree=None, t=None, taxonomy_db=None):
     
     taxonomy_db.annotate_tree(reftree,  taxid_attr="name")
     
-
     return reftree
 
 
@@ -356,10 +328,8 @@ def get_reftree(t,taxonomy_db):
     
     elif clase.split('.')[1] == 'gtdb_taxonomy':
         for leaf in t: 
-            #print(leaf.name)
             taxid_list.append(str(leaf.name))
     
-    #print(taxid_list)
     #Extract the smallest tree that connects all your query taxid
     reftree = taxonomy_db.get_topology(taxid_list)
     
@@ -379,9 +349,11 @@ def get_taxonomy_counter(reftree):
         
         level2sp_num[taxid] = len(mems)
 
-    #print('euk in tree: ', level2sp_num['2759'])
     return level2sp_num
         
+
+
+
 
 def get_lca_node(sp_list, taxonomy_db):
     lineages = OrderedCounter()
@@ -515,33 +487,26 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT_, taxonomy_co
     #For each taxonomic level in the leaves's lineage, save sp under that level 
     sp_per_level = defaultdict(set)
 
-    #count_2 = defaultdict(set)
-
-    # sfor k,val in CONTENT.items():
-       # print(type(k), type(val))
-   # print(type(n))
-
     for l in CONTENT_[n]:
         if l.props.get('taxid') not in sp_out_up:
             sp_in_node.add(l.props.get('taxid'))
-            #print(type(l.props.get('lineage')))
-            for tax in l.props.get('lineage').split('|'):
-                # count_lin[tax] += 1
+
+            for tax in l.props.get('lineage').split('|'):    
                 sp_per_level[tax].add(str(l.props.get('taxid')))
 
     sp2remove = set()
     
     # Detect outliers for each taxid from lineages
     
-    #for tax, num in count_lin.items():
-    
-    best_rep = defaultdict()
-    best_rep_num = defaultdict()
-    best_rep_node = defaultdict()
+    # best_rep = defaultdict()
+    # best_rep_num = defaultdict()
+    # best_rep_node = defaultdict()
+     #best_rep_val = 0.0
+
     tax_out = list()
-    #best_rep_val = 0.0
-    
+   
     for tax, num in sp_per_level.items():
+        
         #num = sp at that tax level in the node 
         #sp_in_node = all sp in the node 
         #levels_eggnog = number of sp at that taxonomic level in reftree (ej sp number of bilateria in eggnog reftree )
@@ -550,14 +515,14 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT_, taxonomy_co
             #global_linages = numero de sp para ese nivel taxonomico en todo el arbol
             #SPTOTAL = numero de sp en total del arbo
         
-        #print(tax)
-        if len(taxonomy_db.get_lineage(tax)) < int(n_up_lin)+2:
-
+       
+        if len(taxonomy_db.get_lineage(tax)) <= int(n_up_lin)+2:
+            
+        
             #% lineage in the node
             per_Node = len(num) / len(sp_in_node)
-            best_rep_node[tax] = per_Node
 
-           
+            #best_rep_node[tax] = per_Node
 
             #% lineage in tree
             #per_Tree = num / global_linages[level][tax]
@@ -566,12 +531,12 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT_, taxonomy_co
 
             #% lineage in reference species tree
             per_Egg = len(num) / taxonomy_counter[str(tax)]
+
             # if per_Egg > best_rep_val:
                 # #print(tax, len(num), per_Egg)
                 # best_rep_val = per_Egg
-            best_rep[tax] = per_Egg
-            best_rep_num[tax] = len(num)
-                
+            # best_rep[tax] = per_Egg
+            # best_rep_num[tax] = len(num)
             
 
             # If % of sp in the node at that taxonomic level is below 1%  and % of sp in reftree is below 5%, remove that species, that means:
@@ -590,17 +555,15 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT_, taxonomy_co
                 if per_Egg < outliers_reftree and per_Node < outliers_node:
                     sp2remove.update(sp_per_level[tax])
                     tax_out.append(tax)
-                
-
-            
+                        
                     
-    if len(tax_out) > 0:
-        print(n.name, tax_out)
+    # if len(tax_out) > 0:
+        # print(n.name, tax_out)
     
     n.add_prop('outliers_tax', tax_out)
-    n.add_prop('BEST_REP', best_rep)
-    n.add_prop('BEST_RESP_NUM', best_rep_num)
-    n.add_prop('BEST_REP_NODE', best_rep_node)
+    # n.add_prop('BEST_REP', best_rep)
+    # n.add_prop('BEST_RESP_NUM', best_rep_num)
+    # n.add_prop('BEST_REP_NODE', best_rep_node)
 
     return sp2remove
 
@@ -731,14 +694,10 @@ def check_nodes_up(node):
 #STEPS OF THE ANALYSIS
 def run_preanalysis(t, name_tree, taxonomy_db, midpoint):
     
-    
-    #_t0.start()
-    
     print('\n'+'START PROCESSING TREE: '+name_tree)
     
     t.resolve_polytomy()
     
-
     if  midpoint == "Yes":
         print('-Run midpoint rooting')
         midpoint = t.get_midpoint_outgroup()
@@ -754,24 +713,16 @@ def run_preanalysis(t, name_tree, taxonomy_db, midpoint):
     # Total species in tree and total members in tree
     sp_set = set()
     total_mems_in_tree = set(t.get_leaf_names())
-    user_props = set()
+    #user_props = set()
     
     for n in t.traverse():
-        user_props.update(set(n.props.keys()))
-        # for p in n.props.keys():
-            # if p not in ['common_name', 'named_lineage', '_speciesFunction', 'rank']:
-                # user_props.add(p)
+        #user_props.update(set(n.props.keys()))
         if not n.is_leaf():
             #Create an ID for each internal node
             name = id_generator()
             n.add_prop('name', name)
             
         else:
-            # n.name = re.sub('-', '', n.name)
-            # info_name = n.name.split('.', 1)
-            # #info_name_2 = re.sub('\.', '', info_name[1])
-            # n.name = info_name[0]+'.'+info_name[1]
-            
             sp_set.add(n.props.get('taxid'))
             
     
@@ -785,10 +736,6 @@ def run_preanalysis(t, name_tree, taxonomy_db, midpoint):
 
     CONTENT = t.get_cached_content()
     
-    
-    #_t0.stop()
-    
-    
     t, props = run_clean_properties(t)
     tree_nw = get_newick(t, props)
     
@@ -797,37 +744,23 @@ def run_preanalysis(t, name_tree, taxonomy_db, midpoint):
 
 def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org, so_arq, so_bact, so_euk, CONTENT, taxonomy_counter, taxonomy_db, SPTOTAL, reftree, inherit_out):
 
-
-    #_t1.start()
-
     print('\n'+'DETECT OUTLIERS AND DUPS SCORE FUNCTION')
     print('\t'+'--Outliers threshodls:')
     print('\t'+'\t'+'--Node: '+ str(outliers_node))
     print('\t'+'\t'+'--Reftree: '+ str(outliers_reftree))
     print('\t'+'--Species losses percentage threshold: ' + str(sp_loss_perc))
 
-    # print(t_nw)
     t = PhyloTree(t_nw, format = 1)
 
     CONTENT = t.get_cached_content()
-    #CONTENT2 = CONTENT    
-
 
     t.add_prop('is_root', str('True'))
 
-
     for n in t.traverse("preorder"):
-
-
-
         
         n.del_prop('named_lineage')
-        #n.del_prop('lineage')
         n.del_prop('_speciesFunction')
-        #n.del_prop('rank')
-
-        # n.add_prop('_sci_name', sci_name)
-        # n.del_prop('sci_name')
+        
         sci_name = clean_string(n.props.get('sci_name'))
         n.props["sci_name"] = sci_name
 
@@ -837,6 +770,7 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
         else:
             
             n.del_prop('common_name')
+
             #DETECT OUTLIERS
             sp_out = set()
             leaves_out = set()
@@ -853,24 +787,21 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
                             sp_out.add(sp)
                             
 
-
             if n.up:
                 n_up_lin = len(n.up.props.get('lineage'))
+               
             else:
-                n_up_lin = 2
+                n_up_lin = len(n.props.get('lineage').split('|'))
+                
 
             
-            
-            #_t3.start()
             #Detect outliers in each of children nodes
-            #if n.props.get('rank') not in ['genus', 'family', 'strain', 'species', 'subspecies']:
-
-            #sp_out.update(outliers_detection(n, outliers_node, outliers_reftree, CONTENT, taxonomy_counter, sp_out_up, n_up_lin,taxonomy_db))
+            
             ch1 = n.children[0]
             sp_out.update(outliers_detection(ch1, outliers_node, outliers_reftree, CONTENT, taxonomy_counter, sp_out_up, n_up_lin,taxonomy_db))
             ch2 = n.children[1]
             sp_out.update(outliers_detection(ch2, outliers_node, outliers_reftree, CONTENT, taxonomy_counter, sp_out_up, n_up_lin,taxonomy_db))
-           # _t3.stop()
+           
 
             if len(sp_out) > 0:
                 all_leafs = CONTENT[n]
@@ -888,10 +819,6 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
 
             all_spcs = set()
 
-
-            #sp_out deberia ser diferente para los nodos hijos en vez de el mismo?????
-
-
             #Save info for children_node_1
             ch1_name = n.children[0].props.get('name')
             sp_ch1 = set()
@@ -902,6 +829,7 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
                     all_spcs.add(str(l.props.get('taxid')))
                     sp_ch1.add(str(l.props.get('taxid')))
                     leaves_ch1.add(l.props.get('name'))
+
 
             #Save info for children_node_2
             ch2_name = n.children[1].props.get('name')
@@ -914,6 +842,7 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
                     sp_ch2.add(str(l.props.get('taxid')))
                     leaves_ch2.add(l.props.get('name')) 
             
+
             #Re-calculate species overlap after detect outliers
             overlaped_spces = set(sp_ch1 & sp_ch2)
             
@@ -924,7 +853,7 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
             else:
                 so_score = 0.0
             
-            #_t7.start()
+    
             #Calculate common ancestor and rank for the species included in that node
             if len(sp_in) > 0:
                 lca_node = get_lca_node(sp_in, taxonomy_db)
@@ -938,7 +867,7 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
                 lin_lca = taxonomy_db.get_lineage(lca_node)
                 n.add_prop('lineage', lin_lca)
                 n.add_prop('taxid', lca_node)
-            #_t7.stop()
+
 
             #SAVE PROPERTIES
             n.add_prop('lca_node', lca_node)
@@ -946,7 +875,6 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
     
             n.add_prop('lca_node_name', lca_node_name.replace(":", ""))
 
-        
             n.props['sci_name'] = n.props.get('lca_node_name')        
             n.add_prop('rank', rank)
             n.add_prop('_sp_in', sp_in)
@@ -969,19 +897,14 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
 
             
             # Load_node_scores add properties: score1, score2 and inpalalogs_rate
-            #_t2.start()
+            
             load_node_scores(n, SPTOTAL)
             dup_score = get_dup_score(n)        
             n.add_prop('dup_score', dup_score)
-            #_t2.stop()
-          
-            #_t4.start()
+         
             percentage_losses(n, reftree)
-            #_t4.stop()
           
-            #_t5.start()
             losses(n, reftree)
-            #_t5.stop()
 
 
             if 2 in lin_lca:
@@ -991,8 +914,7 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
             elif 2157 in lin_lca:
                 so_2_use = so_arq
             elif lca_node == 131567:
-                so_2_use = so_cell_org
-                
+                so_2_use = so_cell_org     
             else:
                 so_2_use = 0.2
 
@@ -1001,33 +923,20 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
                 if float(n.props.get('species_losses_percentage')[0]) > sp_loss_perc and float(n.props.get('species_losses_percentage')[1]) > sp_loss_perc:
                     n.add_prop('evoltype_2', 'FD')
 
-                # elif not n.is_root() and  float(n.props.get('support')) < 70.0:
-                    # n.add_prop('evoltype_2', 'FD')
-                
                 else:                
                     n.add_prop('evoltype_2', 'D')
 
-
             else:
                 n.add_prop('evoltype_2', 'S')
-
-            # sif n.props.get('len_sp_in') == 1 and len(n.props.get('_leaves_in')) >3:
-                # n.add_prop('evoltype_2', 'IN')
-
-
-    #_t1.stop()
     
     t, props = run_clean_properties(t)
-    #tree_nw = get_newick(t, props)
-
+    
     return t
 
 
 def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org, so_arq, so_bact, so_euk, taxonomy_db, total_mems_in_tree):
 
-    
-    #t = PhyloTree(t_nw, format = 1)    
-    #_t6.start()
+
     #ogs_info, save info of nodes that are OGs
     ogs_info = defaultdict(dict)
 
@@ -1085,21 +994,17 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
                 
                 lca_target = node.props.get('lca_node')
                 
-
                 #Save Dups under child 1 and child2 that have the same lca_node
                 dups_under_ch1 = node.children[0].search_nodes(evoltype_2='D', lca_node=lca_target)
                 dups_under_ch2 = node.children[1].search_nodes(evoltype_2='D', lca_node=lca_target)
 
-            
                 save_dups_ch1 = defaultdict()
                 save_dups_ch2 = defaultdict()
 
                 # Check that dups under child1 and child2 (that have the same lca) fit out requirements : species overlap min requirement,
-                # more than 2 leaves and more than 2 species
+                # more than 1 leaves and more than 1 species
                 if len(dups_under_ch1)> 0:
-
                     for n_ in  dups_under_ch1:
-                        
                         if float(n_.props.get('so_score'))>= so_2_use \
                         and len(n_.props.get('_leaves_in')) >1 and len(n_.props.get('_sp_in'))> 1 :  
                             root2node = node.get_distance(node, n_, topology_only=True)
@@ -1114,40 +1019,28 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
                             root2node = node.get_distance(node, n_, topology_only=True)
                             save_dups_ch2[n_.name] = root2node
                             
-                
-
                 #If dups under child1 do not achieve our requirement, then child1 is OG
                 if len(save_dups_ch1) == 0:
                     annotate_dups_ch(ogs_info, total_mems_in_ogs, taxid_dups_og,node, 'ch1', taxonomy_db)
                     
-                   
-
                 #If dups under child2 do not achieve our requirement, then child2 is OG
                 if len(save_dups_ch2) == 0 :    
                     annotate_dups_ch(ogs_info, total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
-                   
-
+            
 
             # No more dups under node with the same lca_node
             elif len(dups_under_node) == 0:
                 annotate_dups_ch(ogs_info, total_mems_in_ogs, taxid_dups_og,node, 'ch1', taxonomy_db)
                 annotate_dups_ch(ogs_info, total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
                 
-
-    #_t6.stop()
-    #print(ogs_info.keys())
-
-   
     t, props = run_clean_properties(t)
-    #tree_nw = get_newick(t, props)
-    
+   
     return t, total_mems_in_ogs, ogs_info, taxid_dups_og
 
 
 def add_ogs_up_down(t, ogs_info):
 
-    #t = PhyloTree(t_nw, format = 1)
-
+   
     for node in t.traverse('preorder'):
 
         node_name = node.name
@@ -1160,13 +1053,13 @@ def add_ogs_up_down(t, ogs_info):
                 dups_down.append(n.up.name)
         
         if len(ogs_down) > 0:
-            if node.props.get('node_is_og'):#and not node.props.get('is_root'):
+            if node.props.get('node_is_og'):
                 ogs_info[node_name]['ogs_down'] = ','.join(list(ogs_down))
                 ogs_info[node_name]['dups_down'] = dups_down
             node.add_prop('_ogs_down',ogs_down)
             node.add_prop('_dups_down', dups_down)
         else:
-            if node.props.get('node_is_og'):# and not node.props.get('is_root'):
+            if node.props.get('node_is_og'):
                 ogs_info[node_name]['ogs_down'] = '-'
                 ogs_info[node_name]['dups_down'] = '-'
         
@@ -1176,19 +1069,18 @@ def add_ogs_up_down(t, ogs_info):
         ogs_up, dups_up = check_nodes_up(node)
         
         if len(ogs_up) > 0:
-            if node.props.get('node_is_og'): #and not node.props.get('is_root'):
+            if node.props.get('node_is_og'): 
                 ogs_info[node_name]['ogs_up'] = ','.join(list(ogs_up))
                 ogs_info[node_name]['dups_up'] = dups_up
             node.add_prop('_ogs_up', ogs_up)
             node.add_prop('_dups_up', dups_up)
         else:
-            if node.props.get('node_is_og'): #and not node.props.get('is_root'):
+            if node.props.get('node_is_og'): 
                 ogs_info[node_name]['ogs_up'] = '-'
                 ogs_info[node_name]['dups_up'] = '-'
     
     t, props = run_clean_properties(t)
-    #tree_nw = get_newick(t, props)
-
+    
     return t, ogs_info 
 
 
@@ -1259,7 +1151,45 @@ def flag_seqs_out_og(t, total_mems_in_ogs, total_mems_in_tree):
 
 #FUNCTIONS FOR RECOVERING SEQUENCES PIPELINE
 #create fastas
-def run_write_fastas(fasta, name_tree, path_out, ogs_info, total_mems_in_ogs, total_mems_in_tree):
+
+def write_outog_seqs(fasta, diff, not_og_fasta):
+    
+    with open(not_og_fasta, 'w') as  f_out:
+        for name_seq in diff:        
+            aa = fasta.get_seq(name_seq)
+            clean_aa = aa.replace('-','')
+            f_out.write('>'+name_seq+'\n'+clean_aa+'\n')
+
+
+def write_og_seqs_regular_mode(fasta, ogs_info, path_out):
+
+    for name_og, info in ogs_info.items():
+        if not 'is_root' in ogs_info[name_og].keys():
+            lca = str(info['lca_dup'])
+            with open(path_out+'/'+name_og+'_'+lca+'.raw_fasta.faa', 'w') as f_out:
+                list_mems = info["ogs_mems"].split('|')
+                if len(list_mems) >0:
+                    for m in list_mems:
+                        aa = fasta.get_seq(m)
+                        clean_aa = aa.replace('-','')
+                        f_out.write('>'+m+'\n'+clean_aa+'\n')
+
+
+def write_og_seqs_fast_mode(fasta, ogs_info, path_out):
+    for name_og, info in ogs_info.items():
+        if not 'is_root' in ogs_info[name_og].keys():
+            lca = str(info['lca_dup'])
+            with open(path_out+'/'+name_og+'_'+lca+'.aln', 'w') as f_out:
+                list_mems = info["ogs_mems"].split('|')
+                if len(list_mems) >0:
+                    for m in list_mems:
+                        aa = fasta.get_seq(m)
+                        f_out.write('>'+m+'\n'+aa+'\n')
+
+
+
+
+def run_write_fastas(fasta, name_tree, path_out, ogs_info, total_mems_in_ogs, total_mems_in_tree, mode):
     print('-Fastas')
 
     fasta = SeqGroup(fasta)
@@ -1269,25 +1199,37 @@ def run_write_fastas(fasta, name_tree, path_out, ogs_info, total_mems_in_ogs, to
     name_fam = name_tree.split('.')[0]
     not_og_fasta = path_out+'/'+name_fam+'.notOG.faa'
 
+    write_outog_seqs(fasta, diff, not_og_fasta)
 
-    with open(not_og_fasta, 'w') as  f_out:
-        for name_seq in diff:
-            
-            aa = fasta.get_seq(name_seq)
-            clean_aa = aa.replace('-','')
-            f_out.write('>'+name_seq+'\n'+clean_aa+'\n')
-
-    for name_og, info in ogs_info.items():
-        if not 'is_root' in ogs_info[name_og].keys():
-            lca = str(info['lca_dup'])
-            with open(path_out+'/'+name_og+'_'+lca+'.faa.aln', 'w') as f_out:
-                list_mems = info["ogs_mems"].split('|')
-                if len(list_mems) >0:
-                    for m in list_mems:
-                        aa = fasta.get_seq(m)
-                        f_out.write('>'+m+'\n'+aa+'\n')
+    if mode == "regular":
+        write_og_seqs_regular_mode(fasta, ogs_info, path_out)
+    elif mode == "fast":
+        write_og_seqs_fast_mode(fasta, ogs_info, path_out)
 
     return
+
+
+def run_mafft(raw_fasta, path_out, name_og):
+    aln_fasta = path_out+'/'+name_og+'.aln'
+    subprocess.run(("mafft --auto --anysymbol %s > %s" %(raw_fasta, aln_fasta)), shell = True)
+
+def run_famsa(raw_fasta,path_out, name_og):
+    aln_fasta = path_out+'/'+name_og+'.aln'
+    subprocess.run(("famsa %s %s" %(raw_fasta, aln_fasta)), shell = True)
+
+
+def run_alignments(path_out):
+
+    total_aln = glob.glob(path_out+'/*.raw_fasta.faa')
+    for aln in total_aln:
+        aln_seq = SeqGroup(aln)
+        name_og = os.path.basename(aln).split('.')[0]
+
+        if len(aln_seq) <= 100:
+            run_mafft(aln,path_out, name_og)
+        else:
+            run_famsa(aln, path_out, name_og)
+
 
 
 #Build HMM
@@ -1408,8 +1350,6 @@ def update_og_info(og_info, og_info_recovery):
         info['ogs_mems'] = str2set
         
         
-    
-    
     for og, recover_seqs in og_info_recovery.items():
         
         og_info[og]['ogs_mems'].update(recover_seqs)
@@ -1595,6 +1535,23 @@ def write_ogs_info(ogs_info, pipeline ,path):
 
 
 
+#EMAPPER APP
+def run_emapper(alg_fasta,path_out):
+    fasta = SeqGroup(alg_fasta)
+    path2raw = path_out+'/total_raw_fasta.faa'
+    raw_fasta = open(path2raw, 'w')
+    for num, (name, aa, _) in enumerate(fasta):
+        clean_aa = aa.replace('-','')
+        raw_fasta.write('>'+name+'\n'+clean_aa+'\n')
+    raw_fasta.close()
+
+    subprocess.run(("python /home/plaza/soft/eggnog-mapper/emapper.py  --hmm_maxhits 0 --cut_ga --hmm_maxseqlen 60000 --pfam_realign denovo --clean_overlaps clans --dbtype hmmdb --qtype seq \
+        -i %s -o %s" %(path2raw, path_out)), shell = True)
+
+
+        
+
+
 
 ###############################################
 ###############################################
@@ -1602,8 +1559,13 @@ def write_ogs_info(ogs_info, pipeline ,path):
 
 
 #MAIN FUNCION (run all steps of the analysis)
-def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org,so_arq, so_bact, so_euk, reftree, user_counter, user_taxo, taxonomy_type, midpoint, path_out, inherit_out):
+def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org,so_arq, so_bact, so_euk, reftree, user_counter, user_taxo, taxonomy_type, midpoint, path_out, inherit_out, mode):
 
+
+    if args.emapper == 'Yes':
+        run_emapper(args.alg, path_out)
+        annot_tree_annotation_table()
+        annot_tree_pfam_table()
 
     #Load files and DBs:    
     t = run_load_tree(tree = tree)
@@ -1624,17 +1586,16 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
     #Annotate root
     annotate_root(ogs_info, t, taxonomy_db, total_mems_in_tree, total_mems_in_ogs, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org, so_arq, so_bact, so_euk)
     
+    #Add info about Core-OGs up and down
     t, ogs_info = add_ogs_up_down(t, ogs_info)
-    
   
-    #Extended OGs at each taxid level
+    #Get Core-OGs at each taxid level
     taxlev2ogs =  get_taxlevel2ogs(t, taxid_dups_og, total_mems_in_ogs,taxonomy_db)
     
     #Flag seqs out OGs
     t = flag_seqs_out_og(t, total_mems_in_ogs, total_mems_in_tree)
 
     write_ogs_info(ogs_info, 'original', path_out)
-
 
     #If aln, run recovery pipeline
     if args.alg and len(total_mems_in_tree.difference(total_mems_in_ogs)) > 0:
@@ -1644,24 +1605,26 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
         if not os.path.exists(pathout):
             os.mkdir(pathout)
         fasta = args.alg
-        run_write_fastas(fasta, name_tree, pathout, ogs_info, total_mems_in_ogs, total_mems_in_tree)
+        run_write_fastas(fasta, name_tree, pathout, ogs_info, total_mems_in_ogs, total_mems_in_tree, mode)
+
+        #Build Aln
+
+        if mode == "regular":
+            run_alignments(pathout)   
+        
 
         #Build HMM
-        
         run_create_hmm_og(pathout)
 
         #Run hmmscan
         tblfile = run_hmmscan(pathout)
-        #print(tblfile)
 
         #Get best match: for each seqs, best og
         best_match = get_best_match(tblfile)
         
-
         #og_info_recovery = og_name : recover_seqs
         og_info_recovery, recovery_seqs = expand_hmm(best_match, ogs_info)
         recovery_seqs = set(best_match.keys())
-        
         
         og_info_updated = update_og_info(ogs_info, og_info_recovery)
 
@@ -1672,7 +1635,6 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
 
         t = update_tree(t, og_info_recovery)
         t, ogs_info = add_ogs_up_down(t, og_info_updated)
-
 
         # Write output files
         
@@ -1698,6 +1660,8 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
         run_write_post_tree(t, name_tree, path_out, all_props)
 
 
+    
+
     return(t)
 
 
@@ -1715,6 +1679,7 @@ if __name__ == "__main__":
     parser.add_argument('--tree', dest = 'tree', required = True)
     parser.add_argument('--raw_alg', dest = 'alg')
     parser.add_argument('--output_path', dest = 'out_path', required= True)
+    parser.add_argument('--mode', dest='mode', choices= ["fast", "regular"], default = "regular", type = str)
     parser.add_argument('--species_overlap_cell_org', dest = 'so_cell_org' , default = 0.2, type = float)
     parser.add_argument('--species_overlap_euk', dest = 'so_euk' , default = 0.2, type = float)
     parser.add_argument('--species_overlap_bact', dest = 'so_bact' , default = 0.2, type = float)
@@ -1728,6 +1693,7 @@ if __name__ == "__main__":
     parser.add_argument('--user_taxonomy', dest = 'user_taxonomy')
     parser.add_argument('--user_taxonomy_counter', dest = 'user_taxonomy_counter')
     parser.add_argument('--reftree', dest = 'reftree')
+    parser.add_argument('--run_emapper', dest = 'emapper', choices = ['Yes', 'No'], default = 'No')
 
     
     args = parser.parse_args()
@@ -1746,6 +1712,7 @@ if __name__ == "__main__":
     path_out = args.out_path
     inherit_out = args.inherit_out
     alg = args.alg
+    mode = args.mode
 
     if args.out_path:
         path_out = args.out_path
@@ -1778,7 +1745,7 @@ if __name__ == "__main__":
 
     _t.start()
 
-    run_app(init_tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org,so_arq, so_bact, so_euk, rtree, user_counter, user_taxo, taxonomy_type, midpoint, path_out, inherit_out)
+    run_app(init_tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org,so_arq, so_bact, so_euk, rtree, user_counter, user_taxo, taxonomy_type, midpoint, path_out, inherit_out, mode)
 
     _t.stop()
     print(Timer.timers)  
