@@ -238,7 +238,7 @@ def taxlev2ogs_annotated_tree(t, taxid_dups_og,taxonomy_db):
                 taxlev2ogs[taxid]['ogs_names'].add(node.name)
                 taxlev2ogs[taxid]['mems'].update(set(node.props.get('_mems_og').split('|')))
                 if node.props.get('recover_seqs'):
-                    print(node.props.get('recover_seqs'))
+                    
                     taxlev2ogs[taxid]['mems'].update(node.props.get('recover_seqs').split('|'))
 
                 
@@ -250,7 +250,7 @@ def taxlev2ogs_annotated_tree(t, taxid_dups_og,taxonomy_db):
                         n_down  = t.search_nodes(name = n_name_down)[0]
                         taxlev2ogs[taxid]['mems'].update(set(n_down.props.get('_mems_og').split('|')))
                         if n_down.props.get('recover_seqs'):
-                            print(n_down.props.get('recover_seqs'))
+                            
                             taxlev2ogs[taxid]['mems'].update(n_down.props.get('recover_seqs').split('|'))
                 
             # elif node.props.get('node_create_og') and taxid != node.props.get("lca_node") and taxid in node.props.get("lineage"):
@@ -1667,7 +1667,6 @@ def write_ogs_info(ogs_info, pipeline ,path):
         for og_name, info in ogs_info.items():
             if not 'is_root' in info.keys():
             
-                print(og_name, info.keys())
                 if isinstance(info['ogs_mems'], str):
                     members_str = info['ogs_mems']
                     num_og_mems = len(members_str.split('|'))
@@ -1907,7 +1906,7 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
         shutil.rmtree(pathout)
 
 
-    print(len(best_match))
+   
 
     #Annotate root
     annotate_root(ogs_info, t, total_mems_in_tree, sp_set, total_mems_in_ogs, recovery_seqs, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org, so_arq, so_bact, so_euk, inherit_out, taxonomy_db)
