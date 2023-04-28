@@ -29,7 +29,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
 OGD_props = list()
-with open('/data/projects/og_delineation/data/OGD_props.txt') as f:
+with open('./data/OGD_props.txt') as f:
     for line in f:
         OGD_props.append(line.strip())
 
