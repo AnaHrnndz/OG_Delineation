@@ -1855,7 +1855,7 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
   
     
     best_match = defaultdict()
-    #total_recovery_seqs = set()
+    recovery_seqs = set()
     #If aln, run recovery pipeline
     if args.alg and len(total_mems_in_tree.difference(total_mems_in_ogs)) > 0:
 
