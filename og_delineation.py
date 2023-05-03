@@ -704,6 +704,8 @@ def annotate_root(ogs_info, t, total_mems_in_tree, sp_set, total_mems_in_ogs, re
     # If no OGs in tree, or the taxonomic level of OGs are under taxonomic level of the root
     # Root is  OG 
 
+    name = t.props.get("name")
+
     if len(ogs_info.keys()) == 0 or t.props.get('lca_node') not in lca_all_dups:
         t.add_prop('root_is_og', 'True')
         ogs_info[name]["name_dup"] = t.props.get("name")
