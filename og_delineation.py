@@ -1638,9 +1638,10 @@ def get_seq2og(t, best_match=dict()):
 
     return seq2ogs
 
-def write_seq2ogs(seq2ogs, path):
-
-    seq2ogs_out = open(path+'/seq2ogs.tsv', 'w')
+def write_seq2ogs(seq2ogs, path, name_tree):
+    
+    name_fam = name_tree.split('.')[0]
+    seq2ogs_out = open(path+'/'+name_fam+'_seq2ogs.tsv', 'w')
     for seq, ogs in seq2ogs.items():
         ogs_out = list()
         for taxlev, og_name in ogs.items():
@@ -1910,14 +1911,14 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
 
    
 
-    #Annotate root
+    #Annotate rootannotate_root
     annotate_root(ogs_info, t, total_mems_in_tree, sp_set, total_mems_in_ogs, recovery_seqs, outliers_node, outliers_reftree, sp_loss_perc, so_cell_org, so_arq, so_bact, so_euk, inherit_out, taxonomy_db)
     #Flag seqs out OGs
     t = flag_seqs_out_og(t, total_mems_in_ogs, total_mems_in_tree)
     
     
     # Write output files
-    seq2ogs = get_seq2og(t, best_match)
+    seq2ogs = get_seq2og(t, best_match, name_tree)
     write_seq2ogs(seq2ogs, path_out)
     
     t, all_props = run_clean_properties(t)
