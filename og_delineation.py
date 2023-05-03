@@ -1918,8 +1918,8 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
     
     
     # Write output files
-    seq2ogs = get_seq2og(t, best_match, name_tree)
-    write_seq2ogs(seq2ogs, path_out)
+    seq2ogs = get_seq2og(t, best_match)
+    write_seq2ogs(seq2ogs, path_out,  name_tree)
     
     t, all_props = run_clean_properties(t)
     run_write_post_tree(t, name_tree, path_out, all_props)
