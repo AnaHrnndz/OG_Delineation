@@ -21,15 +21,21 @@ import csv
 import tarfile
 import os
 import shutil
+import pathlib
 
-sys.path.append('/data/projects/og_delineation_web/bin')
+
+cwd =  str(pathlib.Path(__file__).parent.resolve())
+print(cwd)
+bin_path =  cwd+'/bin'
+data_path = cwd+'/data'
+sys.path.append(bin_path)
 
 warnings.filterwarnings("ignore", category=RuntimeWarning) 
 
 chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
 OGD_props = list()
-with open('./data/OGD_props.txt') as f:
+with open(data_path+'/OGD_props.txt') as f:
     for line in f:
         OGD_props.append(line.strip())
 
@@ -1850,6 +1856,7 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
    
     #Add info about Core-OGs up and down
     t, ogs_info = add_ogs_up_down(t, ogs_info)
+    print(ogs_info)
  
     #Get Core-OGs at each taxid level
     #taxlev2ogs =  get_taxlevel2ogs(t, taxid_dups_og, total_mems_in_ogs,taxonomy_db)
@@ -1860,7 +1867,7 @@ def run_app(tree, name_tree, outliers_node, outliers_reftree, sp_loss_perc, so_c
     best_match = defaultdict()
     recovery_seqs = set()
     #If aln, run recovery pipeline
-    if args.alg and len(total_mems_in_tree.difference(total_mems_in_ogs)) > 0:
+    if args.alg and len(total_mems_in_tree.difference(total_mems_in_ogs)) > 0 and len(total_mems_in_ogs) > 0:
 
         name_fam = os.path.basename(args.tree).split('.')[0]
         pathout = path_out+'/'+name_fam+'_aln_hmm'
