@@ -698,14 +698,14 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
                 sp_out_inherit = set()
 
 
-            # n_up_lin is the depth of parent node taxonomic level, needed for the outliers detection
+            # n_up_lin: Depth of parent node taxonomic level, needed for the outliers detection
             if n.up:
                 n_up_lin = len(n.up.props.get('lineage'))
             else:
                 n_up_lin = len(n.props.get('lineage').split('|'))
 
 
-            #Detect outliers in each of children nodes
+            #   Detect outliers in each of children nodes
             ch1 = n.children[0]
             sp_out.update(outliers_detection(ch1, outliers_node, outliers_reftree, CONTENT, taxonomy_counter, sp_out_inherit, n_up_lin,taxonomy_db))
             ch2 = n.children[1]
@@ -730,6 +730,19 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
                         # leaves_in.add(l.props.get('name'))
 
 
+
+            #   Save info for children_node_1
+            ch1_name = n.children[0].props.get('name')
+            ch1_leaf_names = list(ch1.leaf_names())
+            sp_ch1 = set()
+            leaves_ch1 = set()
+
+            #   Save info for children_node_2
+            ch2_name = n.children[1].props.get('name')
+            ch2_leaf_names = list(ch2.leaf_names())
+            sp_ch2 = set()
+            leaves_ch2 = set()
+
             all_leafs = CONTENT[n]
             for l in all_leafs:
                 if l.name in long_leaves:
@@ -743,33 +756,27 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
                     sp_in_list.append(str(l.props.get('taxid')))
                     leaves_in.add(l.props.get('name'))
 
+                    if l.name in ch1_leaf_names:
+                        sp_ch1.add(str(l.props.get('taxid')))
+                        leaves_ch1.add(l.props.get('name'))
+                    elif l.name in ch2_leaf_names:
+                        sp_ch2.add(str(l.props.get('taxid')))
+                        leaves_ch2.add(l.props.get('name'))
 
 
-            #Save info for children_node_1
-            ch1_name = n.children[0].props.get('name')
-            sp_ch1 = set()
-            leaves_ch1 = set()
+            # for l in ch1:
+                # if str(l.props.get('taxid')) not in sp_out and l.name not in long_leaves:
+                    # sp_ch1.add(str(l.props.get('taxid')))
+                    # leaves_ch1.add(l.props.get('name'))
 
-            for l in ch1:
-                if str(l.props.get('taxid')) not in sp_out and l.name not in long_leaves:
-                   # all_spcs.add(str(l.props.get('taxid')))
-                    sp_ch1.add(str(l.props.get('taxid')))
-                    leaves_ch1.add(l.props.get('name'))
-
-
-            #Save info for children_node_2
-            ch2_name = n.children[1].props.get('name')
-            sp_ch2 = set()
-            leaves_ch2 = set()
-
-            for l in ch2:
-                if str(l.props.get('taxid')) not in sp_out and l.name not in long_leaves:
-                   # all_spcs.add(str(l.props.get('taxid')))
-                    sp_ch2.add(str(l.props.get('taxid')))
-                    leaves_ch2.add(l.props.get('name'))
+            # for l in ch2:
+                # if str(l.props.get('taxid')) not in sp_out and l.name not in long_leaves:
+                    # sp_ch2.add(str(l.props.get('taxid')))
+                    # leaves_ch2.add(l.props.get('name'))
 
 
-            #Re-calculate species overlap after detect outliers
+
+            #   Re-calculate species overlap after detect outliers
             overlaped_spces = set(sp_ch1 & sp_ch2)
 
             if len(overlaped_spces)>0:
@@ -780,29 +787,32 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
                 so_score = 0.0
 
 
-            #Calculate common ancestor and rank for the node after detect outliers
-            if len(sp_in) > 0:
-                lca_node = get_lca_node(sp_in, taxonomy_db)
-                rank = clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
-                lin_lca = taxonomy_db.get_lineage(lca_node)
-                n.add_prop('lineage', lin_lca)
-                n.add_prop('taxid', lca_node)
-            elif len(sp_in) == 0:
-                lca_node = 1
-                rank = clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
-                lin_lca = taxonomy_db.get_lineage(lca_node)
-                n.add_prop('lineage', lin_lca)
-                n.add_prop('taxid', lca_node)
+            #   Update last common ancestor, rank and lineage for the node after detect outliers
+            update_taxonomical_props(n, sp_in, taxonomy_db)
+
+            # if len(sp_in) > 0:
+                # lca_node = get_lca_node(sp_in, taxonomy_db)
+                # rank = clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
+                # lin_lca = taxonomy_db.get_lineage(lca_node)
+                # n.add_prop('lineage', lin_lca)
+                # n.add_prop('taxid', lca_node)
+            # elif len(sp_in) == 0:
+                # lca_node = 1
+                # rank = clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
+                # lin_lca = taxonomy_db.get_lineage(lca_node)
+                # n.add_prop('lineage', lin_lca)
+                # n.add_prop('taxid', lca_node)
 
 
-            #SAVE PROPERTIES
-            n.add_prop('lca_node', lca_node)
-            lca_node_name = taxonomy_db.get_taxid_translator([lca_node])[lca_node]
+            #   Save properties
+            # n.add_prop('lca_node', lca_node)
+            # lca_node_name = taxonomy_db.get_taxid_translator([lca_node])[lca_node]
 
-            n.add_prop('lca_node_name', lca_node_name.replace(":", ""))
+            # n.add_prop('lca_node_name', lca_node_name.replace(":", ""))
 
-            n.props['sci_name'] = n.props.get('lca_node_name')
-            n.add_prop('rank', rank)
+            # n.props['sci_name'] = n.props.get('lca_node_name')
+            #n.add_prop('rank', rank)
+
             n.add_prop('_sp_in', sp_in)
             n.add_prop('len_sp_in', len(sp_in))
             n.add_prop('_sp_in_ch1', sp_ch1)
@@ -822,7 +832,7 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
             n.add_prop('so_score', so_score)
 
 
-            # Load_node_scores add properties: score1, score2 and inpalalogs_rate
+            #   Load_node_scores add properties: score1, score2 and inpalalogs_rate
 
             #load_node_scores(n, SPTOTAL)
 
@@ -843,6 +853,9 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
             call_lineage_lost(n, reftree)
 
 
+            #   Based on species overlap threshold define duplication, false duplication and speciation nodes
+            lin_lca = n.props.get('lineage')
+            lca_node = n.props.get('lca_node')
             if 2 in lin_lca:
                 so_2_use = so_bact
             elif 2759 in lin_lca:
@@ -854,17 +867,13 @@ def run_outliers_dup_score(t_nw, outliers_node, outliers_reftree, sp_loss_perc, 
             else:
                 so_2_use = 0.2
 
-            #Calculate species overlap after outliers detection
             if so_score >= so_2_use:
                 if float(n.props.get('species_losses_percentage')[0]) > sp_loss_perc and float(n.props.get('species_losses_percentage')[1]) > sp_loss_perc:
                     n.add_prop('evoltype_2', 'FD')
-
                 else:
                     n.add_prop('evoltype_2', 'D')
-
             else:
                 n.add_prop('evoltype_2', 'S')
-
 
 
     t, props = run_clean_properties(t)
@@ -962,6 +971,27 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT_, taxonomy_co
 
     n.add_prop('outliers_tax', tax_out)
     return sp2remove
+
+def update_taxonomical_props(n, sp_in, taxonomy_db):
+
+    if len(sp_in) > 0:
+        lca_node = get_lca_node(sp_in, taxonomy_db)
+        rank = clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
+        lin_lca = taxonomy_db.get_lineage(lca_node)
+        n.add_prop('lineage', lin_lca)
+        n.add_prop('taxid', lca_node)
+    elif len(sp_in) == 0:
+        lca_node = 1
+        rank = clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
+        lin_lca = taxonomy_db.get_lineage(lca_node)
+        n.add_prop('lineage', lin_lca)
+        n.add_prop('taxid', lca_node)
+
+    n.add_prop('lca_node', lca_node)
+    lca_node_name = taxonomy_db.get_taxid_translator([lca_node])[lca_node]
+    n.add_prop('lca_node_name', lca_node_name.replace(":", ""))
+    n.props['sci_name'] = n.props.get('lca_node_name')
+    n.add_prop('rank', rank)
 
 def get_lca_node(sp_list, taxonomy_db):
 
@@ -1134,7 +1164,7 @@ def run_dups_and_ogs(t, outliers_node, outliers_reftree, sp_loss_perc, so_cell_o
 
 
     for node in t.traverse("preorder"):
-        node.del_prop('_speciesFunction')
+        #node.del_prop('_speciesFunction')
         lin2check = node.props.get('lineage')
 
         lca_node = node.props.get('lca_node')
