@@ -7,6 +7,7 @@ MAIN FUNCTION, run all steps of the analysis:
         rooting: Midpoint or MinVar
         taxonomical annotation: NCBI,
         save original species and original leafs
+        **t.dist = 0.01** ¿? para visualizar
     3. Outliers and Dups score:
         3.1. **Detect long branches**
         3.2. **taxonomical outliers in root**: al menos  10% de euk, bact o arq
@@ -20,15 +21,19 @@ MAIN FUNCTION, run all steps of the analysis:
                 - score1
                 - score2
                 - inpalalogs_rate
+                - dup_score
+                - linage lost
+        3.5 Definir si nodo es Speciation, Duplication or False Duplication
     4. Detect Duplications and Core-OGs: Select high quality duplication nodes and Core Orthologs Groups (OGs)
     5. Get base-OGs: Esto es nuevo
     6. Add info about Core-OGs up and down: For each Core-OG detect upper and below Core-OGs (Core-OGs have nested structure)
     7. Annotate base-OGs
     8. Write a table with the results for the Core-OGs
-    9. Optionally modify the Core-OGs by recovering sequences. TENGO QUE ACTULIZARLO
+    9. Optionally modify the Core-OGs by recovering sequences.
     10. Annotate root: Root is a special node that has to be annotated diffent
     11. Flag seqs out OGs: If some seqs still out at least one Core-OGs, add a flag for visualization
     12. Optionally add annotations from emapper (see EMAPPER ANNOTATION)
+    12. Optionally get all orthologs pairs
     13. Write output files:
         seq2ogs
         tree
@@ -41,7 +46,7 @@ RECOVERY PIPELINE
             2. Create HMM file for each Core-OGs fasta file and Build HMM DB
             3. Run Hmmscan to assign seqs out Core-OGs to Core-OGs
             4. For each seq out Core-OGs, select best Core-OGs
-            5. Expand_hmm: Create a dict with all the OGs that have recover some seq           TODO: change name expand_hmm
+            5. Expand_hmm: Create a dict with all the OGs that have recover some seq
             6. update_og_info: Update og_info with all the seqs taht have been recovered
             7. update_tree: Update tree with all the seqs taht have been recovered
             8. write_ogs_info for recovery
