@@ -1,4 +1,6 @@
+import os
 import sys
+
 sys.path.append("..")
 
 import og_delineation
@@ -64,4 +66,6 @@ def test_annot_main_table():
 
     print
 
-
+def test_dummy_run():
+    assert os.system("""python og_delineation.py --tree egg6_ogd_vs_egg6_oficial/original_trees/D6J8K.nw --user_taxonomy /data/databases/ETE_taxonomy/EggNOG6/e6.taxa.sqlite \
+                    --output_path ./tests/ --rooting MinVar --raw_alg egg6_ogd_vs_egg6_oficial/original_trees/D6J8K.faa.aln  --get_pairs --mode fast""") == 0

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 from ete4 import  PhyloTree, SeqGroup, Tree
 from ete4 import NCBITaxa, GTDBTaxa
@@ -6,23 +7,21 @@ import sys
 import os
 import numpy as np
 import json
-import string
-import random
-import time
+#import string
 import argparse
 import warnings
-import pickle
 import re
 import glob
 import subprocess
-from django.utils.crypto import get_random_string
 import csv
-import tarfile
-import os
-import shutil
 import pathlib
-import itertools
 
+
+sys.path.append('/data/projects/og_delineation/ogd')
+from emapper_annotate import annotate_with_emapper
+from recovery import recover_sequences
+import  pairs
+from timer import Timer
 
 cwd =  str(pathlib.Path(__file__).parent.resolve())
 
@@ -34,10 +33,10 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
-OGD_props = list()
-with open(data_path+'/OGD_props.txt') as f:
-    for line in f:
-        OGD_props.append(line.strip())
+# OGD_props = list()
+# with open(data_path+'/OGD_props.txt') as f:
+    # for line in f:
+        # OGD_props.append(line.strip())
 
 
 class OrderedCounter(Counter, OrderedDict):
@@ -47,107 +46,6 @@ class OrderedCounter(Counter, OrderedDict):
                             OrderedDict(self))
      def __reduce__(self):
          return self.__class__, (OrderedDict(self),)
-
-class TimerError(Exception):
-
-    """A custom exception used to report errors in use of Timer class"""
-
-class Timer:
-    timers = dict()
-
-    def __init__(
-        self,
-        name=None,
-        text="Elapsed time: {:0.4f} seconds",
-        logger=None,
-    ):
-        self._start_time = None
-        self.name = name
-        self.text = text
-        self.logger = logger
-
-        # Add new named timers to dictionary of timers
-        if name:
-            self.timers.setdefault(name, 0)
-
-    def start(self):
-
-        """Start a new timer"""
-
-        if self._start_time is not None:
-
-            raise TimerError(f"Timer is running. Use .stop() to stop it")
-
-
-        self._start_time = time.perf_counter()
-
-    def stop(self):
-        """Stop the timer, and report the elapsed time"""
-        if self._start_time is None:
-            raise TimerError(f"Timer is not running. Use .start() to start it")
-
-        elapsed_time = time.perf_counter() - self._start_time
-        self._start_time = None
-
-        if self.logger:
-            self.logger(self.text.format(elapsed_time))
-        if self.name:
-            self.timers[self.name] += elapsed_time
-
-        return elapsed_time
-
-def start_timers():
-
-    timers = defaultdict()
-
-    total_time = Timer("Total")
-    _t0 = Timer("Start")
-    _t1 = Timer("Outliers")
-    _t2 = Timer("Iter_dups")
-    _t3 = Timer("OGs_file")
-    _t4 = Timer("Fastas")
-    _t5 = Timer("Post_tree")
-    _t6 = Timer('species_out')
-    _t7 = Timer("lineage losses")
-    _t8 = Timer("species losses")
-    _t9 = Timer("test")
-
-def clean_string(string):
-
-    """
-        Remove problematic characters for newick format
-    """
-
-    clean_string = re.sub(r"'|\[|\]|\=|\.|\-|\:", "", string)
-    return clean_string
-
-def get_newick(t, all_props):
-
-    """
-        Return tree in newick format with annotations
-    """
-
-    t = t.write(props=all_props, format_root_node=True)
-    return t
-
-def check_nodes_up(node):
-
-    """
-        Find OGs in upper nodes
-    """
-
-    ogs_up = set()
-    dups_up = list()
-    while node.up:
-        if node.up.props.get('node_is_og'):
-            if not node.up.props.get('is_root'):
-                ogs_up.add(node.up.props.get('name'))
-                dups_up.append(node.up.up.props.get('name'))
-            else:
-                ogs_up.add(node.up.props.get('name'))
-        node = node.up
-
-    return ogs_up, dups_up
 
 
 ####    FUNCTIONS FOR OG DELINEATION WEB    ####
@@ -263,6 +161,43 @@ def parse_taxid(node):
 
     #TODO: add argument for split gen name
     return node.name.split('.')[0]
+
+def clean_string(string):
+
+    """
+        Remove problematic characters for newick format
+    """
+
+    clean_string = re.sub(r"'|\[|\]|\=|\.|\-|\:", "", string)
+    return clean_string
+
+def get_newick(t, all_props):
+
+    """
+        Return tree in newick format with annotations
+    """
+
+    t = t.write(props=all_props, format_root_node=True)
+    return t
+
+def check_nodes_up(node):
+
+    """
+        Find OGs in upper nodes
+    """
+
+    ogs_up = set()
+    dups_up = list()
+    while node.up:
+        if node.up.props.get('node_is_og'):
+            if not node.up.props.get('is_root'):
+                ogs_up.add(node.up.props.get('name'))
+                dups_up.append(node.up.up.props.get('name'))
+            else:
+                ogs_up.add(node.up.props.get('name'))
+        node = node.up
+
+    return ogs_up, dups_up
 
 
 
@@ -915,24 +850,6 @@ def get_dup_score(n):
 
     return dup_score
 
-# def call_lineage_lost (node, reftree, taxonomy_db):
-    # """
-        # Call count_lineage_losses() to count how many lineages are missing in each children node
-        # TODO:
-            # if sentence, change dup_score maybe better with species overlap??? or maybe just delte the if and calculate count_lienage_losses for all nodes (duplication and speciacion nodes)
-    # """
-
-    # sp1 = node.props.get('_sp_in_ch1')
-    # sp2 = node.props.get('_sp_in_ch2')
-
-
-
-    # if len(sp1|sp2) > 0:
-        # losses1, lin_losses1 = count_lineage_lost(expected_sp=sp1|sp2, found_sp=sp1, reftree=reftree, taxonomy_db=taxonomy_db)
-        # losses2, lin_losses2 = count_lineage_lost(expected_sp=sp1|sp2, found_sp=sp2, reftree=reftree, taxonomy_db=taxonomy_db)
-        # node.add_prop('num_lineage_losses', [losses1, losses2])
-        # node.add_prop('_taxid_lineage_losses', [lin_losses1, lin_losses2])
-
 def best_lin_lost(expected_sp, found_sp, taxonomy_db):
 
     diff_sp = expected_sp.difference(found_sp)
@@ -969,82 +886,6 @@ def best_lin_lost(expected_sp, found_sp, taxonomy_db):
 
 
     return best_loss
-
-# def count_lineage_lost(expected_sp, found_sp, reftree, taxonomy_db):
-
-    # """
-        # Find how many lineages are missing
-        # Lineage: all species under internal node
-        # If all species under internal node are lost, then losses +=1
-    # """
-
-
-    # def is_leaf_2(_n):
-        # if not _n.children:
-            # return True
-        # elif len(found_sp & set(_n.leaf_names())) == 0:
-            # return True
-        # else:
-            # return False
-
-
-    # losses = 0
-    # lca_lin_lost = set()
-
-    # if len(expected_sp) == 1:
-        # return losses, lca_lin_lost
-
-    # elif len(expected_sp) > 1:
-
-        # expected_reftree = reftree.common_ancestor(expected_sp)
-
-        # for leaf in expected_reftree.leaves(is_leaf_fn=is_leaf_2):
-
-            # losses +=1
-
-            # #Find missing lineages are very slow
-            # #anc = get_lca_node(leaf.leaf_names(), taxonomy_db)
-            # #lca_lin_lost.add(anc)
-
-        # return losses, lca_lin_lost
-
-# def call_species_lost(node, reftree):
-    # """
-        # Call count_species_losses() for each children node
-        # TODO: if sentence?? delete?? change dup_score for species overlap???
-    # """
-
-    # sp1 = node.props.get('_sp_in_ch1')
-    # sp2 = node.props.get('_sp_in_ch2')
-
-    # if len(sp1|sp2) > 0:
-        # losses1, per_loss1 = count_species_lost(expected_sp=sp1|sp2, found_sp=sp1, reftree=reftree)
-        # losses2, per_loss2 = count_species_lost(expected_sp=sp1|sp2, found_sp=sp2, reftree=reftree)
-        # node.add_prop('species_losses', [losses1, losses2])
-        # node.add_prop('species_losses_percentage', [per_loss1, per_loss2])
-
-    # else:
-        # node.add_prop('species_losses', [0, 0])
-        # node.add_prop('species_losses_percentage', [0.0, 0.0])
-
-# def count_species_lost(expected_sp, found_sp, reftree):
-
-    # """
-        # Calculate number of species_losses -> number of expected species - number of found species
-        # Calculate percentage of species_losses_percentage -> losses / number of expected species
-    # """
-
-    # if len(expected_sp) == 1:
-        # return 0, 0
-
-
-    # root = reftree.common_ancestor(expected_sp)
-
-
-    # losses = len(root) - len(found_sp)
-    # per_loss = losses / len(root)
-
-    # return int(losses), float(per_loss)
 
 def sp_lost_v2(n, level2sp_mem):
 
@@ -1443,487 +1284,6 @@ def flag_seqs_out_og(t, total_mems_in_ogs, total_mems_in_tree):
 
 
 
-####    FUNCTIONS FOR RECOVERING SEQUENCES PIPELINE ####
-
-def recover_sequences(tree, t, alg, total_mems_in_tree, total_mems_in_ogs, name_tree, path_out, ogs_info, mode):
-
-    name_fam = os.path.basename(tree).split('.')[0]
-    pathout = path_out+'/'+name_fam+'_aln_hmm'
-    if not os.path.exists(pathout):
-        os.mkdir(pathout)
-    fasta = alg
-
-    # 1. Write a fasta file
-    run_write_fastas(t, fasta, name_tree, pathout, ogs_info, total_mems_in_ogs, total_mems_in_tree, mode)
-
-    if mode == "regular":  # regular mode: Re-aling sequences
-        run_alignments(pathout)
-    else:
-        pass  # we just go with what we had
-
-    # 2. Create HMM file for each Core-OGs fasta file and Build HMM DB
-    run_create_hmm_og(pathout)
-
-    # 3. Run Hmmscan to assign seqs out Core-OGs to Core-OGs
-    tblfile = run_hmmscan(pathout)
-
-    # 4. For each seq out Core-OGs, select best Core-OGs
-    best_match = get_best_match(tblfile)
-    recover_seqs = set(best_match.keys())
-
-    t = expand_hmm(t, best_match)
-
-    total_mems_in_ogs.update(recover_seqs)
-
-
-    # 9. write_best_match
-    write_best_match(best_match, path_out, name_tree)
-
-    output_filename = path_out+'/'+name_fam+'.tar.gz'
-
-    # 10. Tar the folder with all the fasta file, HMMs, etc
-    make_tarfile(output_filename, pathout)
-    shutil.rmtree(pathout)
-
-    return recover_seqs, best_match
-
-
-def run_write_fastas(t, fasta, name_tree, path_out, ogs_info, total_mems_in_ogs, total_mems_in_tree, mode):
-
-    """
-        Function calls  write_outog_seqs() AND write_og_seqs_regular_mode() OR write_og_seqs_fast_mode()
-    """
-
-    print('-Fastas')
-
-    fasta = SeqGroup(fasta)
-
-    diff = (total_mems_in_tree.difference(total_mems_in_ogs))
-
-    name_fam = name_tree.split('.')[0]
-    not_og_fasta = path_out+'/'+name_fam+'.notOG.faa'
-
-    write_outog_seqs(fasta, diff, not_og_fasta)
-
-    if mode == "regular":
-        write_og_seqs_regular_mode(t, fasta, ogs_info, path_out)
-    elif mode == "fast":
-        write_og_seqs_fast_mode(t, fasta, ogs_info, path_out)
-
-    return
-
-def write_outog_seqs(fasta, diff, not_og_fasta):
-
-    """
-        Write fasta file with seqs that do not belong to any OG
-    """
-
-    with open(not_og_fasta, 'w') as  f_out:
-        for name_seq in diff:
-            aa = fasta.get_seq(name_seq)
-            clean_aa = aa.replace('-','')
-            f_out.write('>'+name_seq+'\n'+clean_aa+'\n')
-
-def write_og_seqs_regular_mode(t, fasta, ogs_info, path_out):
-
-    """
-        Write one fasta file per each OG
-        In regular mode, sequences will be realing, so gaps are removed
-    """
-
-    set_trees  = set(t.search_nodes(node_is_og='True'))
-
-
-    for subtree in set_trees:
-        if 'is_root' not in subtree.props:
-            lca = str(subtree.props.get('lca_node'))
-            node_name = subtree.name
-            with open(path_out+'/'+node_name+'_'+lca+'.raw_fasta.faa', 'w') as f_out:
-                list_mems = list(subtree.props.get('_leaves_in'))
-                if len(list_mems) >0:
-                    for m in list_mems:
-                        aa = fasta.get_seq(m)
-                        clean_aa = aa.replace('-','')
-                        f_out.write('>'+m+'\n'+clean_aa+'\n')
-
-def write_og_seqs_fast_mode(t, fasta, ogs_info, path_out):
-
-    """
-        Write one fasta file per each OG
-        In fast mode, sequences wont be realing, so gaps are keept
-    """
-
-    set_trees  = set(t.search_nodes(node_is_og='True'))
-
-    for subtree in set_trees:
-        if 'is_root' not in subtree.props:
-            lca = str(subtree.props.get('lca_node'))
-            node_name = subtree.name
-            with open(path_out+'/'+node_name+'_'+lca+'.aln', 'w') as f_out:
-                list_mems = list(subtree.props.get('_leaves_in'))
-                if len(list_mems) >0:
-                    for m in list_mems:
-                        aa = fasta.get_seq(m)
-                        f_out.write('>'+m+'\n'+aa+'\n')
-
-def run_alignments(path_out):
-
-    """
-        Function call run_mafft() or run_famsa() depend of the size of OG
-    """
-
-    total_aln = glob.glob(path_out+'/*.raw_fasta.faa')
-    for aln in total_aln:
-        aln_seq = SeqGroup(aln)
-        name_og = os.path.basename(aln).split('.')[0]
-
-        if len(aln_seq) <= 100:
-            run_mafft(aln,path_out, name_og)
-        else:
-            run_famsa(aln, path_out, name_og)
-
-def run_mafft(raw_fasta, path_out, name_og):
-
-    """
-        Run mafft software for OGs < 100 seqs
-    """
-
-    aln_fasta = path_out+'/'+name_og+'.aln'
-    subprocess.run(("mafft --auto --anysymbol %s > %s" %(raw_fasta, aln_fasta)), shell = True)
-
-def run_famsa(raw_fasta,path_out, name_og):
-
-    """
-        Run famsa software for OGs > 100 seqs
-    """
-
-    aln_fasta = path_out+'/'+name_og+'.aln'
-    subprocess.run(("famsa %s %s" %(raw_fasta, aln_fasta)), shell = True)
-
-def run_create_hmm_og(path):
-    """
-        Build HHMM file for each OG-aln fasta
-        Create HMM DB with all the HMM files
-
-        TODO: split in 2¿?
-    """
-
-    aln_list = glob.glob(path+'/*.aln')
-    for aln in aln_list:
-        out_hmm = aln+'.hmm'
-        subprocess.run(("hmmbuild %s %s" %(out_hmm, aln)), shell = True)
-
-    hmm_list = glob.glob(path+'/*.hmm')
-    hmm_db = path+'/hmm_db.hmm'
-    for hmm in hmm_list:
-        subprocess.run(("cat %s >>%s" %(hmm, hmm_db)), shell = True)
-
-
-    subprocess.run(("hmmpress %s" %(hmm_db)), shell = True)
-
-def run_hmmscan(path):
-
-    """
-        Run Hmmscan
-    """
-
-    hmm_db = path+'/hmm_db.hmm'
-    outfile = path+'/result_hmmscan.tsv'
-    tblfile = path+'/tblout.tsv'
-    domtblfile = path+'/domfile.tsv'
-    seqs_not_og = glob.glob(path+'/*.notOG.faa')[0]
-    print(("hmmscan -o %s %s %s" %(outfile, hmm_db, seqs_not_og)))
-    subprocess.run(("hmmscan -o %s --tblout %s --domtblout %s  %s %s" %(outfile, tblfile, domtblfile, hmm_db, seqs_not_og)), shell = True)
-    return tblfile
-
-def get_best_match(tblout):
-
-    """
-        For each seq,  get best hit from Hmmscan
-    """
-
-    best_match = defaultdict(dict)
-
-    with open(tblout) as f:
-        for line in f:
-            if not line.startswith('#'):
-                line = re.sub(' +','\t',line)
-                info = line.split('\t')
-                name_og = info[0]
-                name_seq = info[2]
-                score = float(info[5])
-
-                k_ = str()
-                score_ = float()
-                if name_seq in best_match.keys():
-                    for k, val in best_match[name_seq].items():
-                        k_ = k
-                        score_ = val
-
-                    if score > score_:
-                        best_match[name_seq].pop(k_)
-                        best_match[name_seq][name_og] = score
-                else:
-                    best_match[name_seq][name_og] = score
-
-
-    return(best_match)
-
-def write_best_match(best_match, path, name_tree):
-
-    """
-        Write a table with the best match result from hmmscan for each seq
-    """
-    name_fam = name_tree.split('.',1)[0]
-    with open(path+'/'+name_fam+'.best_match.tsv', 'w') as fout:
-        for seq, best_og in best_match.items():
-            for best_og_name in best_og.keys():
-                fout.write('\t'.join([seq, best_og_name])+'\n')
-
-def expand_hmm(t, best_match):
-
-    """
-        Create a dict with all the OGs that have recover some seq
-
-        TODO: change name
-    """
-
-    for seq_name, best_og in best_match.items():
-        for k in best_og.keys():
-            best_og_name = k.split('_')[0]
-
-        if 'recovery_seqs' in t[best_og_name].props:
-            t[best_og_name].props.get('recovery_seqs').update(seq_name)
-
-        else:
-            recovery_set = set()
-            recovery_set.add(seq_name)
-            t[best_og_name].add_prop('recovery_seqs',  recovery_set)
-
-        if t[best_og_name].props.get('ogs_up') != '-':
-            for nup in t[best_og_name].props.get('ogs_up'):
-                if 'recovery_seqs' in t[nup].props:
-                    t[nup].props.get('recovery_seqs').update(seq_name)
-
-                else:
-                    recovery_set = set()
-                    recovery_set.add(seq_name)
-                    t[nup].add_prop('recovery_seqs',  recovery_set)
-    return t
-
-def update_taxlevel2ogs(glob_taxlev2ogs, og_info_recovery, glob_og_info) :
-
-    """
-        update taxlevel2og after recovered step
-        Needed for web
-    """
-
-    for tax, info in glob_taxlev2ogs.items():
-        for og in info['ogs_names']:
-            if og in og_info_recovery.keys():
-                glob_taxlev2ogs[tax]['mems'].update(set(og_info_recovery[og]))
-
-                ogs_up = glob_og_info[og]['ogs_up'].split(',')
-                for og_up in ogs_up:
-
-                    if og_up != '-':
-                        lca_tax = glob_og_info[og_up]['lca_dup']
-                        glob_taxlev2ogs[lca_tax]['mems'].update(set(glob_og_info[og_up]['ogs_mems']))
-
-    return(glob_taxlev2ogs)
-
-def make_tarfile(output_filename, source_dir):
-
-    """
-        Create tar.gz file
-    """
-
-    with tarfile.open(output_filename, "w:gz") as tar:
-        tar.add(source_dir, arcname=os.path.basename(source_dir))
-
-
-
-####    EMAPPER APP     ####
-
-def annotate_with_emapper(t, alg, path_out):
-    """"
-        Add to the leaves of tree t the information coming from emapper
-        and return the annotated tree.
-    """
-    # In the main program, we are actually only interested in annotations
-    # the pfam domains, but we have to take it all from emapper.
-    path2pfam_table, path2main_table = run_emapper(alg, path_out)
-
-    t = annot_tree_pfam_table(t, path2pfam_table, alg)
-
-    t = annot_tree_main_table(t, path2main_table)
-
-    # TODO: Check if we really do not need this (because it
-    # is done in the main function already?):
-    #   t, all_props = run_clean_properties(t)
-    #   run_write_post_tree(t, name_tree, path_out, all_props)
-
-    return t
-
-
-def run_emapper(alg_fasta,path_out):
-
-    """
-        Run eggnog-mapper:
-
-        emapper-2.1.12-f8b9fa5 / Expected eggNOG DB version: 5.0.2 / Installed eggNOG DB version: unknown /
-        Diamond version found: diamond version 2.0.11 / MMseqs2 version found: 113e3212c137d026e297c7540e1fcd039f6812b1 /
-        Compatible novel families DB version: 1.0.1
-
-    """
-
-    fasta = SeqGroup(alg_fasta)
-    path2raw = path_out+'/total_raw_fasta.faa'
-    raw_fasta = open(path2raw, 'w')
-    for num, (name, aa, _) in enumerate(fasta):
-        clean_aa = aa.replace('-','')
-        raw_fasta.write('>'+name+'\n'+clean_aa+'\n')
-    raw_fasta.close()
-
-
-    subprocess.run(("python /data/soft/eggnog-mapper_2.1.12/eggnog-mapper/emapper.py --num_servers 2  --sensmode fast --cpu 2  --cut_ga --pfam_realign denovo  \
-        --clean_overlaps clans --qtype seq \
-        -i %s -o %s --output_dir %s" %(path2raw, 'result_emapper', path_out)), shell = True)
-
-    path2pfam_table = path_out+'/result_emapper.emapper.pfam'
-    path2main_table = path_out+'/result_emapper.emapper.annotations'
-    return path2pfam_table, path2main_table
-
-
-def annot_tree_pfam_table(post_tree, pfam_table, alg_fasta):
-
-    """
-        Annotate tree with pfam table from eggnog-mapper
-    """
-
-    fasta = SeqGroup(alg_fasta)
-    raw2alg = defaultdict(dict)
-    for num, (name, seq, _) in enumerate(fasta):
-
-        p_raw = 1
-        for p_alg, (a) in enumerate(seq, 1):
-            if a != '-':
-                raw2alg[name][p_raw] = p_alg
-                p_raw +=1
-
-    seq2doms = defaultdict(list)
-    with open(pfam_table) as f_in:
-        for line in f_in:
-            if not line.startswith('#'):
-                info = line.strip().split('\t')
-                seq_name = info[0]
-                dom_name = info[1]
-                dom_start = int(info[7])
-                dom_end = int(info[8])
-
-                trans_dom_start = raw2alg[seq_name][dom_start]
-                trans_dom_end = raw2alg[seq_name][dom_end]
-
-                dom_info_string = '@'.join([dom_name, str(trans_dom_start), str(trans_dom_end)])
-                seq2doms[seq_name].append(dom_info_string)
-
-
-
-    for l in post_tree:
-        if l.name in seq2doms.keys():
-            domains = seq2doms[l.name]
-            domains_string = '|'.join(domains)
-            l.add_prop('dom_arq', domains_string)
-
-    for n in post_tree.traverse():
-        if not n.is_leaf:
-            random_seq_name = random.choice(list(n.leaf_names()))
-            random_node = next(post_tree.search_nodes(name=random_seq_name))
-            random_node_domains = random_node.props.get('dom_arq', 'none@none@none')
-            n.add_prop('dom_arq', random_node_domains)
-
-    return post_tree
-
-
-def annot_tree_main_table(post_tree, main_table):
-
-    """
-        Annotate tree with main table from eggnog-mapper
-    """
-
-    seq2info = defaultdict(dict)
-    with open(main_table) as fin:
-        for line in fin:
-            if not line.startswith('#'):
-                info = line.strip().split('\t')
-                seq_name = info[0]
-                eggnog_ogs = info[4]
-                for og in eggnog_ogs.split(','):
-                    level = og.split('|')[0].split('@')[1]
-                    if level in ['2759', '2', '2157'] :
-                        basal_og = og.split('|')[0].split('@')[0]
-                pref_name = info[8]
-                kegg_pathway = info[12]
-
-                seq2info[seq_name]['basal_og'] = basal_og
-                seq2info[seq_name]['pref_name'] = pref_name
-                seq2info[seq_name]['kegg_path'] = kegg_pathway
-
-
-    for l in post_tree:
-        if l.name in seq2info.keys():
-            info_dict = seq2info[l.name]
-            for i, val in info_dict.items():
-                l.add_prop(i, val)
-
-    for n in post_tree.traverse():
-        if not n.is_leaf:
-            random_seq_name = random.choice(list(n.leaf_names()))
-            random_node = next(post_tree.search_nodes(name=random_seq_name))
-            random_node_basal_og = random_node.props.get('basal_og', 'none@none@none')
-            random_node_pref_name = random_node.props.get('pref_name', 'none@none@none')
-            random_node_kegg_path = random_node.props.get('kegg_path', 'none@none@none')
-
-            n.add_prop('basal_og', random_node_basal_og)
-            n.add_prop('pref_name', random_node_pref_name)
-            n.add_prop('kegg_path', random_node_kegg_path)
-
-    return post_tree
-
-
-####    GET ALL ORTHOLOGS PAIRS ####
-
-def get_all_pairs(CONTENT, total_mems_in_ogs):
-
-    'Recovery seqs will not be included'
-
-    def removeDuplicates(lst):
-        return [t for t in (set(tuple(i) for i in lst))]
-
-
-    total_pairs = set()
-    for n in CONTENT:
-        if n.props.get('evoltype_2') ==   'S':
-            leaves0 = n[0].props.get('_leaves_in')
-            leaves1 = n[1].props.get('_leaves_in')
-            if leaves0 != None and leaves1 != None:
-                total_pairs.update(itertools.product(leaves0, leaves1))
-
-
-    clean_pairs = removeDuplicates(total_pairs)
-    print('TOTAL PAIRS: ', len(clean_pairs))
-    return clean_pairs
-
-def write_pairs_table(clean_pairs, path_out, name_tree):
-
-    name_fam = name_tree.split('.',1)[0]
-    pairs_results = path_out+'/'+name_fam+'.pairs.tsv'
-
-    with open(pairs_results, 'w') as fout:
-        for pair in clean_pairs:
-            fout.write('\t'.join(list(pair))+'\n')
-
-
 #####   FUNCIONTS TO PREPARE OUTPUTS FILES (newick, etc)    ####
 
 def run_clean_properties(t):
@@ -2220,8 +1580,8 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
         t = annotate_with_emapper(t, args.alg, path_out)
 
     if args.get_pairs:
-        clean_pairs = get_all_pairs(CONTENT, total_mems_in_ogs)
-        write_pairs_table(clean_pairs, path_out, name_tree)
+        clean_pairs = pairs_module.get_all_pairs(CONTENT, total_mems_in_ogs)
+        pairs_module.write_pairs_table(clean_pairs, path_out, name_tree)
 
     # 13. Write output files
     print('\n4. Writing outputfiles\n')
@@ -2304,15 +1664,6 @@ def main():
 
 
     _t = Timer('Total_time')
-    _t0 = Timer('Preanalysis')
-    _t1 = Timer('Outliers')
-    _t2 = Timer('dup score')
-    _t3 = Timer('outlier detection')
-    _t4 = Timer('Perct losses')
-    _t5 = Timer('Losses')
-    _t6 = Timer('Iter dups')
-    _t7 = Timer('test')
-
     _t.start()
 
     run_app(init_tree, abs_path, name_tree, rtree, user_counter, user_taxo, taxonomy_type, path_out, args)
