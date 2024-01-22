@@ -2,41 +2,41 @@ Script to detect Orthologous Gruops in trees based on duplications events
 
 
 MAIN FUNCTION, run all steps of the analysis:
-    1. Load files needed for the analysis: Tree, taxonomy, reference tree (species tree),taxonomy counter
-    2. Pre-analysis: Run some basic analysis:
-        rooting: Midpoint or MinVar
-        taxonomical annotation: NCBI,
-        save original species and original leafs
-        **t.dist = 0.01** ¿? para visualizar
+    1.  Load files needed for the analysis.
+            Tree, taxonomy, reference tree (species tree), taxonomy counter
+    2.  Tree setup (Pre-analysis). Run some basic analysis:
+            - Resolve polytomies
+            - Rooting;Midpoint or MinVar
+            - NCBI annotation
+            - Save original species and original leaf names
     3. Outliers and Dups score:
-        3.1. **Detect long branches**
-        3.2. **taxonomical outliers in root**: al menos  10% de euk, bact o arq
-        3.3. taxonomical outliers: Esto es nuevo
-            calulo el best_tax , el linaje mas 'especifico' que tenga mas de un 90% de representacion
-            para todas las seqs q no pertenezcan a ese best_tax,
-                recorro todo su linaje, para cada taxa del linaje calulo la representacion en el nodo y en reftree
-                Si en ambos casos la representacion es <0.05, todas las sp de ese taxa seran outliers
-        3.4. Otros parametros
-                - species overlap
-                - score1
-                - score2
-                - inpalalogs_rate
-                - dup_score
-                - linage lost
-        3.5 Definir si nodo es Speciation, Duplication or False Duplication
-    4. Detect Duplications and Core-OGs: Select high quality duplication nodes and Core Orthologs Groups (OGs)
-    5. Get base-OGs: Esto es nuevo
-    6. Add info about Core-OGs up and down: For each Core-OG detect upper and below Core-OGs (Core-OGs have nested structure)
-    7. Annotate base-OGs
-    8. Write a table with the results for the Core-OGs
-    9. Optionally modify the Core-OGs by recovering sequences.
-    10. Annotate root: Root is a special node that has to be annotated diffent
-    11. Flag seqs out OGs: If some seqs still out at least one Core-OGs, add a flag for visualization
-    12. Optionally add annotations from emapper (see EMAPPER ANNOTATION)
-    12. Optionally get all orthologs pairs
-    13. Write output files:
-        seq2ogs
-        tree
+            - Long branches
+            - Taxonomical outliers
+            - Species overlap
+            - Score1
+            - Score2
+            - Inpalalogs rate
+            - Duplication score
+            - Linage lost
+    4. Detect HQ-Duplications:
+            Select high quality duplication that create Basal Orthologs Groups (OGs)
+    5. Get OGs for all taxonomical levels
+    6. Add info about Basal-OGs up and down:
+            For each Basal-OG detect upper and below Basal-OGs (Basal-OGs have nested structure)
+    7. Annotate Basal-OGs with taxonomy, etc
+    8. Write a table with the results for the Basal-OGs
+    9. Optionally modify Basal-OGs by recovering sequences (see RECOVERY PIPELINE)
+    10. Optionally add annotations from emapper (see EMAPPER ANNOTATION)
+    11. Optionally  Get all orthologs pairs
+    12. Annotate root:
+            Root is a special node that has to be annotated diffent
+    13. Flag seqs out OGs
+            If some seqs still out at least one Basal-OGs, add a flag for visualization
+    14. Write output files:
+            - annot_tree
+            - seq2ogs
+
+
 
 RECOVERY PIPELINE
     - Recovery Pipeline: If user provide a alignment file AND some sequences (members) are not included in at least one Core-OGs

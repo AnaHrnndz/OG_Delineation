@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
-
-
-####    EMAPPER APP     ####
-
 import random
 import subprocess
 from collections import defaultdict
 from ete4 import SeqGroup
+
+"""
+EMAPPER ANNOTATION
+        - Eggnog-Mapper: annotate tree sequences with eggnog-mapper, user needs to provide alignment file
+"""
 
 
 def annotate_with_emapper(t, alg, path_out):

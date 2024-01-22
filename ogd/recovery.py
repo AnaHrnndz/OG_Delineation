@@ -7,7 +7,22 @@ import re
 from collections import defaultdict
 from ete4 import SeqGroup
 
-
+"""
+RECOVERY PIPELINE
+    - Recovery Pipeline: If user provide a alignment file AND some sequences (members) are not included in at least one Core-OGs
+        1. Write a fasta file with all raw seqs left out of the Core-OGs and for each Core-OGs write a fasta file
+            1.1 Regular mode: Re-aling sequences
+            1.2 Fast mode: use aligned sequnces
+        2. Create HMM file for each Core-OGs fasta file and Build HMM DB
+        3. Run Hmmscan to assign seqs out Core-OGs to Core-OGs
+        4. For each seq out Core-OGs, select best Core-OGs
+        5. Expand_hmm: Create a dict with all the OGs that have recover some seq
+        6. update_og_info: Update og_info with all the seqs taht have been recovered
+        7. update_tree: Update tree with all the seqs taht have been recovered
+        8. write_ogs_info for recovery
+        9. write_best_match
+        10. Tar the folder with all the fasta file, HMMs, etc
+"""
 
 ####    FUNCTIONS FOR RECOVERING SEQUENCES PIPELINE ####
 
