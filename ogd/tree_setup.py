@@ -68,7 +68,6 @@ def run_rooting(t, rooting,  path_out, abs_path):
     else:
         print(' -No rooting')
 
-    #¿Change?
     t.dist = 0.01
 
     return t

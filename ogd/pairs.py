@@ -20,9 +20,14 @@ def get_all_pairs(CONTENT, total_mems_in_ogs):
                 total_pairs.update(itertools.product(leaves0, leaves1))
 
 
-    clean_pairs = removeDuplicates(total_pairs)
-    print('TOTAL PAIRS: ', len(clean_pairs))
-    return clean_pairs
+    #clean_pairs = removeDuplicates(total_pairs)
+    # print('TOTAL PAIRS: ', len(clean_pairs))
+    # return clean_pairs
+
+
+    print('TOTAL PAIRS: ', len(total_pairs))
+    return total_pairs
+
 
 def write_pairs_table(clean_pairs, path_out, name_tree):
 

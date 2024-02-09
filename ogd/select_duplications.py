@@ -52,31 +52,25 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
                 save_dups_ch2 = 0 #defaultdict(int)
 
 
-                # Check that dups under child1 and child2 (that have the same lca) fit out requirements : species overlap min requirement,
+                # Check that dups under child1 and child2 (that have the same lca) fit all requirements : species overlap min requirement,
                 # more than 1 leaves and more than 1 species
-                #if len(dups_under_ch1)> 0:
+
                 for n_ in  dups_under_ch1:
-                    #if float(n_.props.get('so_score'))>= so_2_use \
                     if len(n_.props.get('_leaves_in')) >1 and len(n_.props.get('_sp_in'))> 1 :
                         save_dups_ch1 += 1
 
 
-                #if len(dups_under_ch2)> 0:
                 for n_ in  dups_under_ch2:
-                   # if float(n_.props.get('so_score'))>= so_2_use  \
                     if  len(n_.props.get('_leaves_in'))>1 and len(n_.props.get('_sp_in'))> 1 :
                         save_dups_ch2 += 1
 
-                #If dups under child1 do not achieve our requirement, then child1 is OG
                 if save_dups_ch1 == 0:
                     annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch1', taxonomy_db)
 
-                #If dups under child2 do not achieve our requirement, then child2 is OG
                 if save_dups_ch2 == 0 :
                     annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
 
 
-            # No more dups under node with the same lca_node, both ch nodes are OGs
             elif len(dups_under_node) == 0:
                 annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch1', taxonomy_db)
                 annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
@@ -97,6 +91,8 @@ def annotate_dups_ch(total_mems_in_ogs, taxid_dups_og, node, ch_node, taxonomy_d
     Add props and save info about the children node that is OG
     node is the duplication node
     target node is the node that is OG
+    node = parent
+    target node = child
     """
 
     if ch_node == 'ch1':

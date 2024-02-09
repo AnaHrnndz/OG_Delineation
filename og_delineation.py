@@ -25,6 +25,8 @@ from outliers_scores import run_outliers_and_scores
 from select_duplications import  run_get_main_dups
 from orthologs_groups import get_ogs
 from timer import Timer
+from annot_treeprofiler import run_annot_treeprofiler
+from messy_ogs import get_messy_groups
 
 cwd =  str(pathlib.Path(__file__).parent.resolve())
 
@@ -326,12 +328,28 @@ def run_write_post_tree(t, name_tree, path_out, all_props):
     return
 
 
+def get_seq2og_v2(base_ogs_annot, messy_ogs):
+
+    seq2ogs = defaultdict(set)
+    for og, info in base_ogs_annot.items():
+        for s in info['Mems'].split('|'):
+            seq2ogs[s].add(og+'@'+info['TaxoLevel'])
+        for s in info['RecoverySeqs'].split('|'):
+            if s != '-':
+                seq2ogs[s].add(og+'@'+info['TaxoLevel'])
+
+    for mog, info in messy_ogs.items():
+        for s in info['Mems']:
+            seq2ogs[s].add(mog+'@'+info['TaxoLevel'])
+
+    return seq2ogs
+
+
 def get_seq2og(t, best_match=dict()):
 
     """
         For each seq get all the OG in which are included
 
-        TODO: simplificar???
     """
 
     seq2ogs = defaultdict(dict)
@@ -380,16 +398,12 @@ def write_seq2ogs(seq2ogs, path, name_tree):
     name_fam = name_tree.split('.')[0]
     seq2ogs_out = open(path+'/'+name_fam+'.seq2ogs.tsv', 'w')
     for seq, ogs in seq2ogs.items():
-        ogs_out = list()
-        for taxlev, og_name in ogs.items():
-            ogs_out.append(og_name+'|'+str(taxlev))
-
-        seq2ogs_out.write(seq+'\t'+'@'.join(ogs_out)+'\n')
+        seq2ogs_out.write(seq+'\t'+'|'.join(list(ogs))+'\n')
 
     seq2ogs_out.close()
 
 
-def write_ogs_info(base_ogs_annot, name_tree, path):
+def write_ogs_info(base_ogs_annot, messy_ogs, name_tree, path):
 
     name_fam = name_tree.split('.',1)[0]
     name_out =  path+'/'+name_fam+'.ogs_info.tsv'
@@ -413,6 +427,21 @@ def write_ogs_info(base_ogs_annot, name_tree, path):
                 base_ogs_annot[og_name]['NumRecoverySeqs'],
                 base_ogs_annot[og_name]['Mems'],
                 base_ogs_annot[og_name]['RecoverySeqs']
+            ))
+
+        for mog_name in messy_ogs.keys():
+            w.writerow((
+                mog_name,
+                messy_ogs[mog_name]['TaxoLevel'],
+                messy_ogs[mog_name]['SciName_TaxoLevel'],
+                messy_ogs[mog_name]['AssocNode'],
+                messy_ogs[mog_name]['NumSP'],
+                messy_ogs[mog_name]['OG_down'],
+                '-',
+                messy_ogs[mog_name]['NumMems'],
+                '-',
+                '|'.join(list(messy_ogs[mog_name]['Mems'])),
+                '-'
             ))
 
 
@@ -473,6 +502,10 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
     # 5. Get OGs for all taxonomical levels
     base_ogs = get_ogs(t, level2sp_mem,taxonomy_db)
 
+    # 6. Get messy OGs
+    t, messy_ogs = get_messy_groups(t, taxonomy_db)
+    #write_mogs(messy_ogs, path_out)
+
     # 6. Add info about nodes that split OGs up and down
     t = add_nodes_up_down(t)
 
@@ -480,7 +513,7 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
     base_ogs_annot = annot_ogs(t, base_ogs, taxonomy_db)
 
     # 8. Write a table with the results for the Basal-OGs
-    write_ogs_info(base_ogs_annot, name_tree, path_out)
+    write_ogs_info(base_ogs_annot, messy_ogs, name_tree, path_out)
 
 
     # 9. Optionally modify Basal-OGs by recovering sequences
@@ -490,7 +523,7 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
         if args.alg and len(total_mems_in_tree.difference(total_mems_in_ogs)) > 0 and len(total_mems_in_ogs) > 0:
             recovery_seqs, best_match = recover_sequences(tree, t, args.alg, total_mems_in_tree, total_mems_in_ogs, name_tree, path_out, base_ogs_annot, args.mode)
             recovery_ogs_annot = annot_ogs(t, base_ogs, taxonomy_db)
-            write_ogs_info(base_ogs_annot, name_tree, path_out)
+            write_ogs_info(base_ogs_annot, messy_ogs, name_tree, path_out)
 
     else:
         recovery_seqs = set()
@@ -499,6 +532,9 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
     # 10. Optionally add annotations from emapper
     if args.run_emapper:
         t = annotate_with_emapper(t, args.alg, path_out)
+
+    if args.path2emapper_table:
+        t = run_annot_treeprofiler(t, args.path2emapper_table, args.alg, path_out)
 
     # 11. Optionally  Get all orthologs pairs
     if args.get_pairs:
@@ -514,7 +550,7 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
 
     # 14. Write output files
     print('\n4. Writing outputfiles\n')
-    seq2ogs = get_seq2og(t, best_match)
+    seq2ogs = get_seq2og_v2(base_ogs_annot, messy_ogs)
     write_seq2ogs(seq2ogs, path_out,  name_tree)
 
     t, all_props = utils.run_clean_properties(t)
@@ -542,8 +578,10 @@ def get_args():
     parser.add_argument('--user_taxonomy_counter')
     parser.add_argument('--reftree')
     parser.add_argument('--run_emapper', action='store_true')
+    parser.add_argument('--run_treeprofiler', dest='path2emapper_table')
     parser.add_argument('--run_recovery', action='store_true')
     parser.add_argument('--get_pairs', action='store_true')
+
 
     return parser.parse_args()
 

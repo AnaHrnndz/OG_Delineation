@@ -6,6 +6,15 @@ def parse_taxid(node):
     return node.name.split('.')[0]
 
 
+def get_newick(t, all_props):
+
+    """
+        Return tree in newick format with annotations
+    """
+
+    t = t.write(props=all_props, format_root_node=True)
+    return t
+
 def run_clean_properties(t):
 
     """
