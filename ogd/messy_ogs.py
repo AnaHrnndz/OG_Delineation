@@ -5,6 +5,7 @@ import utils
 def get_messy_groups(t, taxonomy_db):
 
     messy_ogs = defaultdict(dict)
+    seqs_in_messy_ogs = set()
     c=0
 
     for n in t.traverse():
@@ -22,46 +23,19 @@ def get_messy_groups(t, taxonomy_db):
                     all_mems = ch.props.get('_leaves_in', set())
                     mem2remove = set()
                     nodes2ckech = set(ch.search_nodes(node_is_og='True', lca_dup=lca_target))
-
-                    ogs_down = set()
-                    for n_ in nodes2ckech:
-                        ogs_down.add(n_.name)
-
                     nodes2ckech.update(ch.search_nodes(evoltype_2='D', lca_node=lca_target))
                     for n_ in nodes2ckech:
                         mem2remove.update(n_.props.get('_leaves_in'))
 
                     diff = all_mems.difference(mem2remove)
-                    if  len(diff)> 0:
-                        name = 'mOG_'+str(c)
-                        c+=1
+                    if  len(diff)>1:
 
-                        #messy_ogs[str(lca_target)][name] = diff
-                        messy_ogs[name] = defaultdict()
-                        messy_ogs[name]['TaxoLevel'] = str(lca_target)
-                        messy_ogs[name]['SciName_TaxoLevel'] = taxonomy_db.get_taxid_translator([lca_target])[lca_target]
-                        messy_ogs[name]['AssocNode'] = ch.name
-                        messy_ogs[name]['OG_down'] = '|'.join(list(ogs_down))
-                        messy_ogs[name]['Mems'] = set()
-                        sp_set = set()
-                        for lname in diff:
-                            if 'taxo_outlier' not in ch[lname].props:
-                                old_mOG = ch[lname].props.get('mOG', str())
-                                new_mOG = old_mOG+'@'+name
-                                ch[lname].add_prop('mOG', new_mOG)
-                                messy_ogs[name]['Mems'].add(lname)
-                                sp_set.add(ch[lname].props.get('taxid'))
-                        messy_ogs[name]['NumSP'] = len(sp_set)
-                        messy_ogs[name]['NumMems'] = len(messy_ogs[name]['Mems'])
-
+                        c, messy_ogs, seqs_in_messy_ogs = new_mog(c, messy_ogs, ch, taxonomy_db, seqs_in_messy_ogs, lca_target, diff)
 
         else:
             if n.props.get('evoltype_2')=='D':
 
-                ogs_up, dups_up = utils.check_nodes_up(n)
                 if n.children[0].props.get('node_is_og') == 'True' and n.children[1].props.get('node_is_og') == 'True':
-                    pass
-                elif len(ogs_up)>0:
                     pass
 
                 else:
@@ -75,47 +49,135 @@ def get_messy_groups(t, taxonomy_db):
                             mem2remove.update(n_.props.get('_leaves_in'))
 
                         diff = all_mems.difference(mem2remove)
+                        if  len(diff)>1:
 
-                        if  len(diff)> 1:
-                            name = 'mOG_'+str(c)
-                            c+=1
-
-                            #messy_ogs[str(lca_target)][name] = diff
-                            messy_ogs[name] = defaultdict()
-                            messy_ogs[name]['TaxoLevel'] = str(lca_target)
-                            messy_ogs[name]['SciName_TaxoLevel'] = taxonomy_db.get_taxid_translator([lca_target])[lca_target]
-                            messy_ogs[name]['AssocNode'] = ch.name
-                            messy_ogs[name]['OG_down'] = '|'.join(list(ogs_down))
-                            messy_ogs[name]['Mems'] = set()
-                            sp_set = set()
-                            for lname in diff:
-                                if 'taxo_outlier' not in ch[lname].props:
-                                    old_mOG = ch[lname].props.get('mOG', str())
-                                    new_mOG = old_mOG+'@'+name
-                                    ch[lname].add_prop('mOG', new_mOG)
-                                    messy_ogs[name]['Mems'].add(lname)
-                                    sp_set.add(ch[lname].props.get('taxid'))
-                            messy_ogs[name]['NumSP'] = len(sp_set)
-                            messy_ogs[name]['NumMems'] = len(messy_ogs[name]['Mems'])
+                            c, messy_ogs, seqs_in_messy_ogs = new_mog(c, messy_ogs, ch, taxonomy_db, seqs_in_messy_ogs, lca_target, diff)
 
 
 
-    return t,  messy_ogs
+            # elif n.props.get('node_is_og') == 'True':
+
+                # node_lin = n.props.get('lineage')
+
+                # # Get all lineages in OG
+                # lin2mems = defaultdict(set)
+
+                # all_mems = n.props.get('_leaves_in', set())
+
+                # for mem in all_mems:
+
+                    # for lin in n[mem].props.get('lineage').split('|'):
+
+                        # if int(lin) not in node_lin:
+                            # lin2mems[int(lin)].add(mem)
 
 
-# def annotate_messy_ogs(messy_ogs):
-    # #OG_name        TaxoLevel       SciName_TaxoLevel       AssocNode       NumSP   OG_down OG_up   NumSeqs
-    # for taxid, mog in messy_ogs.items():
-        # for mog_name, mog_mems in mog.items()
-        # sp_set = set()
+                # for lin, mems in lin2mems.items():
+
+                    # nodes2check = set(ch.search_nodes(node_create_og='True',lca_node=lin))
+                    # mems2remove = set()
+                    # for n_ in nodes2check:
+                        # mems2remove.update(n_.props.get('_leaves_in'))
+
+                    # diff = mems.difference(mems2remove)
+                    # if  len(diff)>1:
+                        # c, messy_ogs, seqs_in_messy_ogs = new_mog(c, messy_ogs, n, taxonomy_db, seqs_in_messy_ogs, lin, diff)
 
 
 
+    messy_ogs = add_mogs_up_down(messy_ogs, t)
 
-# def write_mogs(messy_ogs, path_out):
-    # fout_mogs = open(path_out+'/mOGs.tsv', 'w')
+    return t,  messy_ogs, seqs_in_messy_ogs
 
-    # for taxid, mog in messy_ogs.items():
-        # for mog_name, mog_mems in mog.items():
-            # fout_mogs.write(mog_name+'\t'+str(taxid)+'\t'+str(len(mog_mems))+'\t'+','.join(list(mog_mems))+'\n')
-    # fout_mogs.close()
+
+
+def new_mog(c, messy_ogs, ch, taxonomy_db, seqs_in_messy_ogs, lca_target, diff):
+
+    name = 'mOG_'+str(c)
+    c+=1
+
+    messy_ogs[name] = defaultdict()
+    messy_ogs[name]['TaxoLevel'] = str(lca_target)
+    messy_ogs[name]['SciName_TaxoLevel'] = taxonomy_db.get_taxid_translator([lca_target])[lca_target]
+    messy_ogs[name]['AssocNode'] = ch.name
+    messy_ogs[name]['OG_down'] = set()
+    messy_ogs[name]['OG_up'] = set()
+    messy_ogs[name]['Mems'] = set()
+
+    for lname in diff:
+
+        if lname not in ch.props.get('_leaves_out'):
+            old_mOG = ch[lname].props.get('mOG', str())
+            new_mOG = old_mOG+'@'+name
+            ch[lname].add_prop('mOG', new_mOG)
+            messy_ogs[name]['Mems'].add(lname)
+            seqs_in_messy_ogs.add(lname)
+            ogs_up, dups_up = utils.check_nodes_up(ch[lname])
+            messy_ogs[name]['OG_down'].update(set(ogs_up))
+
+    messy_ogs[name]['NumMems'] = len(messy_ogs[name]['Mems'])
+
+    return c ,messy_ogs, seqs_in_messy_ogs
+
+
+def add_mogs_up_down(messy_ogs, t):
+    for mog_name, mog_info in messy_ogs.items():
+        all_mogs = set()
+        mog_level = int(mog_name.split('_')[1])
+
+        for s in mog_info['Mems']:
+            all_mogs.update(set(t[s].props.get('mOG').split('@')))
+
+
+        for mog in all_mogs:
+            if mog != '':
+                lev = int(mog.split('_')[1])
+                if lev == mog_level:
+                    pass
+                elif lev > mog_level:
+                    messy_ogs[mog_name]['OG_down'].add(mog)
+                elif lev < mog_level:
+                    messy_ogs[mog_name]['OG_up'].add(mog)
+
+        if len(messy_ogs[mog_name]['OG_down']) == 0:
+            messy_ogs[mog_name]['OG_down'].add('-')
+
+        if len(messy_ogs[mog_name]['OG_up']) == 0:
+            messy_ogs[mog_name]['OG_up'].add('-')
+
+    return messy_ogs
+
+
+def annotate_messy_og(t, messy_ogs):
+
+
+    for mog_name, info in messy_ogs.items():
+        sp_set = set()
+        recseq_down = set()
+        ogs_up = messy_ogs[mog_name]['OG_down']
+
+        for m in messy_ogs[mog_name]['Mems']:
+            sp_set.add(t[m].props.get('taxid'))
+
+        for og_ in  ogs_up:
+            if og_ != '-':
+                if not og_.startswith('mOG_') :
+                    if t[og_].props.get('recovery_seqs')!= None:
+                        for s in t[og_].props.get('recovery_seqs'):
+                            recseq_down.add(s)
+                            sp_set.add(t[s].props.get('taxid'))
+
+
+        if recseq_down != None:
+            messy_ogs[mog_name]['RecoverySeqs'] = recseq_down
+            messy_ogs[mog_name]['NumRecoverySeqs'] = len(recseq_down)
+        else:
+            messy_ogs[mog_name]['RecoverySeqs'] = ['-']
+            messy_ogs[mog_name]['NumRecoverySeqs'] = str(0)
+
+
+        messy_ogs[mog_name]['NumSP'] = len(sp_set)
+
+
+    return messy_ogs
+

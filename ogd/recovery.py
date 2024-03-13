@@ -225,6 +225,7 @@ def get_best_match(tblout):
 
     best_match = defaultdict(dict)
 
+
     with open(tblout) as f:
         for line in f:
             if not line.startswith('#'):
@@ -270,26 +271,29 @@ def expand_hmm(t, best_match):
     """
 
     for seq_name, best_og in best_match.items():
+
         for k in best_og.keys():
             best_og_name = k.split('_')[0]
 
-        if 'recovery_seqs' in t[best_og_name].props:
-            t[best_og_name].props.get('recovery_seqs').update(seq_name)
+            if 'recovery_seqs' in t[best_og_name].props:
+                t[best_og_name].props.get('recovery_seqs').add(seq_name)
 
-        else:
-            recovery_set = set()
-            recovery_set.add(seq_name)
-            t[best_og_name].add_prop('recovery_seqs',  recovery_set)
+            else:
+                recovery_set = set()
+                recovery_set.add(seq_name)
+                t[best_og_name].add_prop('recovery_seqs',  recovery_set)
 
-        if t[best_og_name].props.get('ogs_up') != '-':
-            for nup in t[best_og_name].props.get('ogs_up'):
-                if 'recovery_seqs' in t[nup].props:
-                    t[nup].props.get('recovery_seqs').update(seq_name)
 
-                else:
-                    recovery_set = set()
-                    recovery_set.add(seq_name)
-                    t[nup].add_prop('recovery_seqs',  recovery_set)
+            if t[best_og_name].props.get('ogs_up') != '-':
+                for nup in t[best_og_name].props.get('ogs_up'):
+                    if 'recovery_seqs' in t[nup].props:
+                        t[nup].props.get('recovery_seqs').add(seq_name)
+
+                    else:
+                        recovery_set = set()
+                        recovery_set.add(seq_name)
+                        t[nup].add_prop('recovery_seqs',  recovery_set)
+
     return t
 
 def update_taxlevel2ogs(glob_taxlev2ogs, og_info_recovery, glob_og_info) :

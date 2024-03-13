@@ -16,7 +16,7 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
 
     #taxid_dups_og, set with the lca of the nodes that are OGs
     taxid_dups_og = set()
-    total_mems_in_ogs = set()
+    #total_mems_in_ogs = set()
 
     #Traverse tree to find the nodes that are "good" duplications and generate OGs.
     print('\n'+'3. Select high quality duplication nodes')
@@ -65,27 +65,34 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
                         save_dups_ch2 += 1
 
                 if save_dups_ch1 == 0:
-                    annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch1', taxonomy_db)
+                    #annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch1', taxonomy_db)
+                    annotate_dups_ch(taxid_dups_og, node, 'ch1', taxonomy_db)
 
                 if save_dups_ch2 == 0 :
-                    annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
+                    #annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
+                    annotate_dups_ch(taxid_dups_og ,node, 'ch2', taxonomy_db)
+
 
 
             elif len(dups_under_node) == 0:
-                annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch1', taxonomy_db)
-                annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
+                # annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch1', taxonomy_db)
+                # annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
+                annotate_dups_ch(taxid_dups_og, node, 'ch1', taxonomy_db)
+                annotate_dups_ch(taxid_dups_og, node, 'ch2', taxonomy_db)
 
 
     lca_root = int(t.props.get('lca_node'))
     if len(list(t.search_nodes(evoltype_2='D', lca_node=lca_root))) == 0:
         t.add_prop('node_is_og', 'True')
-        total_mems_in_ogs.update(set(t.props.get('_leaves_in')))
+        #total_mems_in_ogs.update(set(t.props.get('_leaves_in')))
 
     t, props = utils.run_clean_properties(t)
 
-    return t, total_mems_in_ogs, taxid_dups_og
+    #return t, total_mems_in_ogs, taxid_dups_og
+    return t, taxid_dups_og
 
-def annotate_dups_ch(total_mems_in_ogs, taxid_dups_og, node, ch_node, taxonomy_db):
+#def annotate_dups_ch(total_mems_in_ogs, taxid_dups_og, node, ch_node, taxonomy_db):
+def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
 
     """
     Add props and save info about the children node that is OG
@@ -117,8 +124,14 @@ def annotate_dups_ch(total_mems_in_ogs, taxid_dups_og, node, ch_node, taxonomy_d
 
         taxid_dups_og.add(node.props.get('lca_node'))
         node.add_prop('node_create_og', 'True')
-        sp_in_og = target_node.props.get('_sp_in')
-        sp_in_anc_og = node.props.get('_sp_in')
+        # sp_in_og = target_node.props.get('_sp_in')
+        # sp_in_anc_og = node.props.get('_sp_in')
 
-        total_mems_in_ogs.update(set(og_ch_mems))
+        #total_mems_in_ogs.update(set(og_ch_mems))
+
+
+
+
+
+
 

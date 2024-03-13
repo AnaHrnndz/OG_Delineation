@@ -26,7 +26,7 @@ from select_duplications import  run_get_main_dups
 from orthologs_groups import get_ogs
 from timer import Timer
 from annot_treeprofiler import run_annot_treeprofiler
-from messy_ogs import get_messy_groups
+from messy_ogs import get_messy_groups, annotate_messy_og
 
 cwd =  str(pathlib.Path(__file__).parent.resolve())
 
@@ -214,16 +214,26 @@ def annot_ogs(t, base_ogs, taxonomy_db):
     ##OG_name   TaxoLevel   AssocNode  len_sp_in_OG OG_up   OG_down num_OG_mems    members
 
     annot_base_ogs = defaultdict(dict)
+    total_mems_in_ogs = set()
     for taxa, ogs in base_ogs.items():
         for og_name, og_info in ogs.items():
             sci_name_taxa =  taxonomy_db.get_taxid_translator([taxa])[int(taxa)]
             ogs_down = '|'.join(list((t[og_info[0]].props.get('ogs_down','-'))))
             ogs_up = '|'.join(list((t[og_info[0]].props.get('ogs_up', '-'))))
-            recover_seqs = t[og_info[0]].props.get('recovery_seqs','-')
+            recover_seqs = list(t[og_info[0]].props.get('recovery_seqs', list()))
+
+
+
             mems = og_info[1].split('|')
             sp_in_og = set()
             for l in mems:
                 sp_in_og.add(l.split('.')[0])
+
+            if not recover_seqs:
+                len_recover_seqs = '0'
+                recover_seqs.append('-')
+            else:
+                len_recover_seqs = str(len(recover_seqs))
 
 
             annot_base_ogs[og_name]['TaxoLevel'] = taxa
@@ -235,9 +245,11 @@ def annot_ogs(t, base_ogs, taxonomy_db):
             annot_base_ogs[og_name]['NumMems'] = len(mems)
             annot_base_ogs[og_name]['Mems'] = '|'.join(mems)
             annot_base_ogs[og_name]['RecoverySeqs'] = '|'.join(recover_seqs)
-            annot_base_ogs[og_name]['NumRecoverySeqs'] = str(len(recover_seqs))
+            annot_base_ogs[og_name]['NumRecoverySeqs'] = len_recover_seqs
 
-    return annot_base_ogs
+            total_mems_in_ogs.update(set(mems))
+
+    return annot_base_ogs, total_mems_in_ogs
 
 
 ##  8.Annotate root ##
@@ -341,50 +353,9 @@ def get_seq2og_v2(base_ogs_annot, messy_ogs):
     for mog, info in messy_ogs.items():
         for s in info['Mems']:
             seq2ogs[s].add(mog+'@'+info['TaxoLevel'])
-
-    return seq2ogs
-
-
-def get_seq2og(t, best_match=dict()):
-
-    """
-        For each seq get all the OG in which are included
-
-    """
-
-    seq2ogs = defaultdict(dict)
-    nodes_total_leaves = t.leaves()
-
-    for l in nodes_total_leaves:
-        ogs_up = list()
-        if l.name in best_match.keys():
-
-            for og_recovery, score in best_match[l.name].items():
-                og_recovery_name = og_recovery.split('_',1)[0]
-                n_recovery = next(t.search_nodes(name=og_recovery_name))#[0]
-                ogs_up, dups_up = utils.check_nodes_up(n_recovery)
-                ogs_up.add(og_recovery_name)
-
-        else:
-            ogs_up, dups_up = utils.check_nodes_up(l)
-
-
-        for n_up_name in ogs_up:
-            n_up = next(t.search_nodes(name=n_up_name))#[0]
-            taxlev = n_up.props.get('lca_dup')
-            seq2ogs[l.name][taxlev] = n_up_name
-
-        if t.props.get('node_is_og') == 'True':
-            lca_root = t.props.get('lca_node')
-            root_name = t.props.get('name')
-            seq2ogs[l.name][lca_root] = root_name
-
-    if len(seq2ogs) == 0:
-        for l in nodes_total_leaves:
-            lca_root = t.props.get('lca_node')
-            root_name = t.props.get('name')
-            seq2ogs[l.name][lca_root] = root_name
-
+        for s in info['RecoverySeqs']:
+            if s != '-':
+                seq2ogs[s].add(og+'@'+info['TaxoLevel'])
 
     return seq2ogs
 
@@ -416,32 +387,32 @@ def write_ogs_info(base_ogs_annot, messy_ogs, name_tree, path):
         for og_name in base_ogs_annot.keys():
 
             w.writerow((
-                og_name,
-                base_ogs_annot[og_name]['TaxoLevel'],
-                base_ogs_annot[og_name]['SciName_TaxoLevel'],
-                base_ogs_annot[og_name]['AssocNode'],
-                base_ogs_annot[og_name]['NumSP'],
-                base_ogs_annot[og_name]['OG_down'],
-                base_ogs_annot[og_name]['OG_up'] ,
-                base_ogs_annot[og_name]['NumMems'],
-                base_ogs_annot[og_name]['NumRecoverySeqs'],
-                base_ogs_annot[og_name]['Mems'],
-                base_ogs_annot[og_name]['RecoverySeqs']
+                og_name,    #1
+                base_ogs_annot[og_name]['TaxoLevel'], #2
+                base_ogs_annot[og_name]['SciName_TaxoLevel'], #3
+                base_ogs_annot[og_name]['AssocNode'],   #4
+                base_ogs_annot[og_name]['NumSP'],   #5
+                base_ogs_annot[og_name]['OG_down'], #6
+                base_ogs_annot[og_name]['OG_up'] ,  #7
+                base_ogs_annot[og_name]['NumMems'], #8
+                base_ogs_annot[og_name]['NumRecoverySeqs'], #9
+                base_ogs_annot[og_name]['Mems'], #10
+                base_ogs_annot[og_name]['RecoverySeqs'] #11
             ))
 
         for mog_name in messy_ogs.keys():
             w.writerow((
-                mog_name,
-                messy_ogs[mog_name]['TaxoLevel'],
-                messy_ogs[mog_name]['SciName_TaxoLevel'],
-                messy_ogs[mog_name]['AssocNode'],
-                messy_ogs[mog_name]['NumSP'],
-                messy_ogs[mog_name]['OG_down'],
-                '-',
-                messy_ogs[mog_name]['NumMems'],
-                '-',
-                '|'.join(list(messy_ogs[mog_name]['Mems'])),
-                '-'
+                mog_name, #1
+                messy_ogs[mog_name]['TaxoLevel'],  #2
+                messy_ogs[mog_name]['SciName_TaxoLevel'],  #3
+                messy_ogs[mog_name]['AssocNode'], #4
+                messy_ogs[mog_name]['NumSP'],  #5
+                '|'.join(list(messy_ogs[mog_name]['OG_down'])), #6
+                '|'.join(list(messy_ogs[mog_name]['OG_up'])), #7
+                messy_ogs[mog_name]['NumMems'], #8
+                str(messy_ogs[mog_name]['NumRecoverySeqs']) , #9
+                '|'.join(list(messy_ogs[mog_name]['Mems'])), #10
+                '|'.join((messy_ogs[mog_name]['RecoverySeqs']))#11
             ))
 
 
@@ -497,60 +468,67 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
     t, CONTENT = run_outliers_and_scores(t_nw, taxonomy_db, NUM_TOTAL_SP, level2sp_mem, args)
 
     # 4. Detect HQ-Duplications
-    t, total_mems_in_ogs, taxid_dups_og  = run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args)
+    #t, total_mems_in_ogs, taxid_dups_og  = run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args)
+    t,  taxid_dups_og  = run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args)
 
-    # 5. Get OGs for all taxonomical levels
+
+    # 5. Get Basal-OGs for all taxonomical levels
     base_ogs = get_ogs(t, level2sp_mem,taxonomy_db)
 
-    # 6. Get messy OGs
-    t, messy_ogs = get_messy_groups(t, taxonomy_db)
-    #write_mogs(messy_ogs, path_out)
-
-    # 6. Add info about nodes that split OGs up and down
+    # 5. Add info about OGs up and down
     t = add_nodes_up_down(t)
 
-    # 7. Annotate Basal-OGs
-    base_ogs_annot = annot_ogs(t, base_ogs, taxonomy_db)
+    # 6. Annotate Basal-OGs
+    #base_ogs_annot = annot_ogs(t, base_ogs, taxonomy_db)
+    base_ogs_annot, total_mems_in_ogs = annot_ogs(t, base_ogs, taxonomy_db)
 
-    # 8. Write a table with the results for the Basal-OGs
-    write_ogs_info(base_ogs_annot, messy_ogs, name_tree, path_out)
+    # 7. Get messy OGs
+    t, messy_ogs, seqs_in_messy_ogs = get_messy_groups(t, taxonomy_db)
+    total_mems_in_ogs.update(seqs_in_messy_ogs)
 
 
-    # 9. Optionally modify Basal-OGs by recovering sequences
+    # 8. Optionally modify Basal-OGs by recovering sequences
     recovery_seqs = set()
     best_match = defaultdict()
     if args.run_recovery:
         if args.alg and len(total_mems_in_tree.difference(total_mems_in_ogs)) > 0 and len(total_mems_in_ogs) > 0:
             recovery_seqs, best_match = recover_sequences(tree, t, args.alg, total_mems_in_tree, total_mems_in_ogs, name_tree, path_out, base_ogs_annot, args.mode)
-            recovery_ogs_annot = annot_ogs(t, base_ogs, taxonomy_db)
-            write_ogs_info(base_ogs_annot, messy_ogs, name_tree, path_out)
+            #base_ogs_annot = annot_ogs(t, base_ogs, taxonomy_db)
+            base_ogs_annot, total_mems_in_ogs = annot_ogs(t, base_ogs, taxonomy_db)
+
 
     else:
         recovery_seqs = set()
         best_match = defaultdict()
 
-    # 10. Optionally add annotations from emapper
+
+    # 9. Optionally add annotations from emapper
     if args.run_emapper:
         t = annotate_with_emapper(t, args.alg, path_out)
 
     if args.path2emapper_table:
         t = run_annot_treeprofiler(t, args.path2emapper_table, args.alg, path_out)
 
-    # 11. Optionally  Get all orthologs pairs
+    # 10. Optionally  get all orthologs pairs
     if args.get_pairs:
         clean_pairs = pairs.get_all_pairs(CONTENT, total_mems_in_ogs)
         pairs.write_pairs_table(clean_pairs, path_out, name_tree)
 
-    # 12. Annotate root
+    # 11. Annotate root & messy_ogs
     annotate_root(base_ogs_annot, t, name_tree, total_mems_in_tree, sp_set, total_mems_in_ogs, recovery_seqs, taxonomy_db, args)
+    messy_ogs_annot = annotate_messy_og(t, messy_ogs)
 
-    # 13. Flag seqs out OGs
+    # 12. Flag seqs out OGs
+    total_mems_in_ogs.update(recovery_seqs)
+
     t = flag_seqs_out_og(t, total_mems_in_ogs, total_mems_in_tree)
 
-
-    # 14. Write output files
+    # 13. Write output files
     print('\n4. Writing outputfiles\n')
-    seq2ogs = get_seq2og_v2(base_ogs_annot, messy_ogs)
+
+    write_ogs_info(base_ogs_annot, messy_ogs_annot, name_tree, path_out)
+
+    seq2ogs = get_seq2og_v2(base_ogs_annot, messy_ogs_annot)
     write_seq2ogs(seq2ogs, path_out,  name_tree)
 
     t, all_props = utils.run_clean_properties(t)

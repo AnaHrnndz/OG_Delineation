@@ -6,16 +6,19 @@ def get_ogs(t, level2sp_mem, taxonomy_db):
     my_descendant = get_my_descendant(level2sp_mem, taxonomy_db)
     set_trees  = set(t.search_nodes(node_is_og='True'))
 
-    #set_trees.add(t)
     ogs = defaultdict(dict)
     count = 0
 
     for subtree in set_trees:
 
+        all_leaves_subtree = subtree.props.get('_leaves_in')
+
         lca_subtree = str(subtree.props.get('lca_dup'))
         if lca_subtree == 'None':
             lca_subtree = str(subtree.props.get('lca_node'))
 
+        # Get all descedant taxas for lca_subtree,
+        # if lca_subtree = 2759, get all descendat taxas present in original tree
         lin_lca_subtree = my_descendant[lca_subtree]
         taxa2remove = set()
 
@@ -38,25 +41,60 @@ def get_ogs(t, level2sp_mem, taxonomy_db):
         name = 'OG_'+str(count)
         count+=1
 
-        mems = get_members(subtree, lca_subtree)
-        if len(mems) >=2:
-            ogs[str(lca_subtree)][name] = (subtree.name, mems)
+        if len(all_leaves_subtree) >=1:
+            ogs[str(lca_subtree)][name] = (subtree.name, '|'.join(list(all_leaves_subtree)))
 
-        for taxa in lin2check:
 
-            if str(taxa) in level2sp_mem.keys():
-                if len(list(subtree.search_nodes(lca_node=str(taxa), node_create_og='True'))) == 0:
-                    name = 'OG_'+str(count)
-                    count+=1
-                    mems = get_members(subtree, taxa)
-                    if len(mems.split('|')) >=2:
-                        ogs[str(taxa)][name] = (subtree.name, (mems))
+        # for taxa in lin2check:
+
+            # if str(taxa) in level2sp_mem.keys():
+                # if len(list(subtree.search_nodes(lca_node=str(taxa), node_create_og='True'))) == 0:
+                    # name = 'OG_'+str(count)
+                    # count+=1
+                    # mems = get_members(subtree, taxa)
+                    # if len(mems.split('|')) >=1:
+                        # ogs[str(taxa)][name] = (subtree.name, (mems))
+
+
+
+        '''
+            Si dentro del OG,x ejemplo niv euk hay og niv eumetazoa,
+            pero hay sp eumetazoa fuera de los og-eumetazoa
+            hay que recuperarlas en un messy_og-eumetazoa
+        '''
+        # for taxa in taxa2remove:
+            # subtree_taxa_leaves = set(get_members(subtree, taxa).split('|'))
+
+            # leaves2remove = set()
+            # dups_in_subtree = subtree.search_nodes(lca_node=str(taxa), node_create_og='True')
+            # for n_ in dups_in_subtree:
+                # mems = get_members(subtree, taxa)
+                # leaves2remove.update(set(mems.split('|')))
+
+
+            # if len(subtree_taxa_leaves.difference(leaves2remove))>=1:
+                # name = 'OG_'+str(count)
+                # count+=1
+                # ogs[str(taxa)][name] = (subtree.name, '|'.join(subtree_taxa_leaves.difference(leaves2remove)))
+
+
+
+
 
     base_ogs = from_lca_tree2cellorg(t, ogs, taxonomy_db, count)
 
     return base_ogs
 
+
 def get_my_descendant(level2sp_mem, taxonomy_db):
+
+    '''
+        For each tax-lev (present in my original tree)
+        return all descendat tax-lev (present in original tree)
+        Similar to get_descendant_taxa()from ete but only for taxas present
+        in original tree
+
+    '''
 
     my_descendant = defaultdict(set)
 
@@ -69,9 +107,10 @@ def get_my_descendant(level2sp_mem, taxonomy_db):
 
     return my_descendant
 
+
 def get_members(node, taxa):
 
-    all_leafs = node.props.get('_leaves_in_nodes')
+    all_leafs= node.props.get('_leaves_in_nodes')
 
     mems_set = set()
     for l in all_leafs:
@@ -81,6 +120,7 @@ def get_members(node, taxa):
     mems = '|'.join(list(mems_set))
 
     return mems
+
 
 def from_lca_tree2cellorg(t, base_ogs, taxonomy_db, count):
 
