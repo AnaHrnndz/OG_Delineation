@@ -15,7 +15,7 @@ import csv
 import pathlib
 
 
-sys.path.append('/data/projects/og_delineation/ogd')
+sys.path.append('./ogd')
 from emapper_annotate import annotate_with_emapper
 from recovery import recover_sequences
 import  pairs
