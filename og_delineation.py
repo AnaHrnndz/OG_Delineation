@@ -15,7 +15,7 @@ import csv
 import pathlib
 
 cwd =  str(pathlib.Path(__file__).parent.resolve())
-sys.path.append(cwd+'./ogd')
+sys.path.append(cwd+'/ogd')
 from emapper_annotate import annotate_with_emapper
 from recovery import recover_sequences
 import  pairs

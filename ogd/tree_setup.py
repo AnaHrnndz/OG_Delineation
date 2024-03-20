@@ -77,7 +77,10 @@ def run_minvar(t, path_out, abs_path):
     path2tree = abs_path
     path2tmptree = path_out+'/tmp_tree.nw'
 
-    subprocess.run(("python /data/soft/FastRoot/MinVar-Rooting/FastRoot.py -i %s -o %s" \
+    # subprocess.run(("python /data/soft/FastRoot/MinVar-Rooting/FastRoot.py -i %s -o %s" \
+        # %(path2tree, path2tmptree)), shell = True)
+
+    subprocess.run(("FastRoot.py -i %s -o %s" \
         %(path2tree, path2tmptree)), shell = True)
 
     #t = load_tree_local(tree = path2tmptree)
