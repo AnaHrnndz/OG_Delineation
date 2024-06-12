@@ -73,7 +73,7 @@ def run_hmm_mapper(path2raw, path_out):
     """
 
     subprocess.run(("python /data/soft/eggnog-mapper_2.1.12/eggnog-mapper/hmm_mapper.py \
-        --cut_ga --clean_overlaps clans --usemem --num_servers 1 --num_workers 8 --cpu 8 \
+        --cut_ga --clean_overlaps clans --usemem --num_servers 1 --num_workers 4 --cpu 4 \
         --dbtype hmmdb  -d /data/soft/eggnog-mapper_2.1.9/data/pfam/Pfam-A.hmm \
         --hmm_maxhits 0 --hmm_maxseqlen 60000 \
         --qtype seq -i %s -o %s --output_dir %s" %(path2raw, 'result_emapper', path_out)), shell = True)

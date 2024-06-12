@@ -99,12 +99,22 @@ def get_my_descendant(level2sp_mem, taxonomy_db):
     my_descendant = defaultdict(set)
 
     for taxa in level2sp_mem.keys():
-        total_ancest = taxonomy_db.get_lineage(taxa)
+        
+        if taxa != 'Empty':
+            
+            if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+                total_ancest = taxonomy_db.get_lineage(taxa)
+            elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
+                total_ancest = taxonomy_db.get_name_lineage([taxa])[0][taxa]
+        else:
+            total_ancest = list()
 
+        
         for ancest in total_ancest:
             if str(ancest) in level2sp_mem.keys():
                 my_descendant[str(ancest)].add(taxa)
 
+    
     return my_descendant
 
 
@@ -125,8 +135,16 @@ def get_members(node, taxa):
 def from_lca_tree2cellorg(t, base_ogs, taxonomy_db, count):
 
     lca_tree = t.props.get('lca_node')
-    if '131567' not in base_ogs:
-        taxa2add = taxonomy_db.get_lineage(lca_tree)
+    
+    if len(set(['131567', 'r_root']).intersection(set(base_ogs.keys()))) == 0:
+        
+        taxa2add = list()
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            taxa2add = taxonomy_db.get_lineage(lca_tree)
+        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
+            if lca_tree != 'r_root':
+                taxa2add = taxonomy_db.get_name_lineage([lca_tree])[0][lca_tree]
+        
         mems = get_members(t, str(lca_tree))
         for taxa in taxa2add:
             if str(taxa) not in base_ogs.keys():

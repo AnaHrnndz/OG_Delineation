@@ -2,8 +2,66 @@ import re
 
 def parse_taxid(node):
 
-    #TODO: add argument for split gen name
     return node.name.split('.')[0]
+
+def parse_taxid_gtdb(node):
+
+    #TODO: add argument for split gen name
+    return node.name.split('@')[0]
+
+
+def get_gtdb_rank(gtdb_code):
+    init_rank = gtdb_code.split('__')[0]
+    if init_rank == 'r_root':
+        rank = 'r_root'
+    elif init_rank == 'd':
+        rank = 'Domain'
+    elif init_rank == 'p':
+        rank = 'Phylum'
+    elif init_rank == 'c':
+        rank = 'Class'
+    elif init_rank == 'o':
+        rank = 'Order'
+    elif init_rank == 'f':
+        rank = 'Family'
+    elif init_rank == 'g':
+        rank = 'Genus'
+    elif init_rank == 's':
+        rank = 'Species'
+    else:
+        rank = 'Unk'
+
+    return rank
+
+
+def get_so2use(taxonomy_db, lin_lca, args):
+    print(lin_lca)
+    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+        if 2 in lin_lca:
+            so_2_use = args.so_bact
+        elif 2759 in lin_lca:
+            so_2_use = args.so_euk
+        elif 2157 in lin_lca:
+            so_2_use = args.so_arq
+        elif 'Empty' in lin_lca:
+            so_2_use = 0.0
+        
+
+    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+        
+        if 'd__Bacteria' in lin_lca:
+            so_2_use = args.so_bact
+        elif 'd__Archaea' in lin_lca:
+            so_2_use = args.so_arq
+        elif 'root' in lin_lca:
+            so_2_use = args.so_cell_org
+        elif 'Empty' in lin_lca:
+            so_2_use = 0.0
+
+    else:
+        so_2_use = 0.1
+
+    return so_2_use
 
 
 def get_newick(t, all_props):

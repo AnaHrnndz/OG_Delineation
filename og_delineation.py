@@ -39,17 +39,17 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 ## 1. Load initial info   ##
 
-def load_tree_local(tree=None):
+def load_tree_local(tree=None, taxonomy = None, sp_delimitator = None):
 
     """
         Load Tree from file
     """
 
     print(' -Load tree:', os.path.basename(tree))
-
+    
     t = PhyloTree(open(tree), parser = 0)
 
-    t.set_species_naming_function(utils.parse_taxid)
+    t.set_species_naming_function(lambda node: node.name.split(sp_delimitator)[0])
 
     return t
 
@@ -61,7 +61,7 @@ def load_taxonomy(taxonomy=None, user_taxonomy=None):
         Local server:
             -Eggnog 5
             -Eggnog 6
-            -GTDB????
+            -GTDB v207
     """
 
     if taxonomy == 'NCBI':
@@ -70,7 +70,6 @@ def load_taxonomy(taxonomy=None, user_taxonomy=None):
         else:
             taxonomy_db = NCBITaxa(memory = True)
 
-    #TODO: try gtdb taxonomy
     elif taxonomy == 'GTDB':
         if user_taxonomy != None:
             taxonomy_db = GTDBTaxa(user_taxonomy, memory = True)
@@ -96,8 +95,9 @@ def load_reftree(rtree=None, t=None, taxonomy_db=None):
 
 
     taxonomy_db.annotate_tree(reftree,  taxid_attr="name")
-
+    
     return reftree
+
 
 def get_reftree(t, taxonomy_db):
 
@@ -111,6 +111,7 @@ def get_reftree(t, taxonomy_db):
 
     reftree = taxonomy_db.get_topology(taxid_list)
 
+    
     return reftree
 
 
@@ -131,9 +132,11 @@ def load_taxonomy_counter(reftree=None, user_taxonomy_counter=None):
     else:
         level2sp_mem = get_taxonomy_counter(reftree)
 
+    
     return level2sp_mem
 
-def get_taxonomy_counter(reftree):
+
+def get_taxonomy_counter(reftree, taxonomy = None):
 
     """
         Create Taxonomy counter if user de not provide it
@@ -142,11 +145,16 @@ def get_taxonomy_counter(reftree):
     print('\t**Create taxonomy counter  from gene tree')
 
     level2sp_mem = defaultdict(set)
-    for l in reftree:
-        lin = l.props.get('lineage')
+    for l in reftree:  
+        
+        if l.name.isdigit():
+            lin = l.props.get('lineage')
+        else:
+            lin = l.props.get('named_lineage')
+        
         for tax in lin:
             level2sp_mem[str(tax)].add(l.name)
-
+    
     return level2sp_mem
 
 
@@ -217,7 +225,14 @@ def annot_ogs(t, base_ogs, taxonomy_db):
     total_mems_in_ogs = set()
     for taxa, ogs in base_ogs.items():
         for og_name, og_info in ogs.items():
-            sci_name_taxa =  taxonomy_db.get_taxid_translator([taxa])[int(taxa)]
+            
+            if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+                sci_name_taxa =  taxonomy_db.get_taxid_translator([taxa])[int(taxa)]
+        
+            elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+                sci_name_taxa = taxa
+            
+            
             ogs_down = '|'.join(list((t[og_info[0]].props.get('ogs_down','-'))))
             ogs_up = '|'.join(list((t[og_info[0]].props.get('ogs_up', '-'))))
             recover_seqs = list(t[og_info[0]].props.get('recovery_seqs', list()))
@@ -292,7 +307,14 @@ def annotate_root(base_ogs_annot, t, name_tree, total_mems_in_tree, sp_set, tota
 
     taxlev_list = []
     for taxlev, og in taxlev2ogs.items():
-        sci_name = taxonomy_db.get_taxid_translator([taxlev])[taxlev]
+        
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            sci_name = taxonomy_db.get_taxid_translator([taxlev])[taxlev]
+        
+        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            sci_name = taxlev
+        
+        
         sci_name_taxid = sci_name+'_'+str(taxlev)
         ogs_str = '_'.join(list(og))
         num_mems = len(taxlev2mems[taxlev])
@@ -456,13 +478,14 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
 
     # 1. Load files and DBs
     print('\n0. Load info')
-    t = load_tree_local(tree = tree)
+    t = load_tree_local(tree = tree, taxonomy = taxonomy_type, sp_delimitator = args.sp_delim)
     taxonomy_db = load_taxonomy(taxonomy = taxonomy_type, user_taxonomy= user_taxo)
     reftree = load_reftree(rtree = reftree, t = t, taxonomy_db = taxonomy_db)
     level2sp_mem = load_taxonomy_counter(reftree=reftree, user_taxonomy_counter = user_counter)
-
+    
+    
     # 2. Tree setup (Pre-analysis):  resolve polytomies, rooting, ncbi annotation, etc
-    t_nw , sp_set, total_mems_in_tree, NUM_TOTAL_SP, user_props = run_setup(t, name_tree, taxonomy_db, args.rooting, path_out, abs_path)
+    t_nw , sp_set, total_mems_in_tree, NUM_TOTAL_SP, user_props = run_setup(t, name_tree, taxonomy_db, args.rooting, path_out, abs_path, args.sp_delim)
 
     # 3. Outliers and Dups score functions
     t, CONTENT = run_outliers_and_scores(t_nw, taxonomy_db, NUM_TOTAL_SP, level2sp_mem, args)
@@ -559,6 +582,8 @@ def get_args():
     parser.add_argument('--run_treeprofiler', dest='path2emapper_table')
     parser.add_argument('--run_recovery', action='store_true')
     parser.add_argument('--get_pairs', action='store_true')
+    parser.add_argument('--sp_delimitator', dest = 'sp_delim', default='-')
+
 
 
     return parser.parse_args()

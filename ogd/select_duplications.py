@@ -12,9 +12,7 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
             - No more duplication nodes at the same taxonomic level below the node
     """
 
-
-
-    #taxid_dups_og, set with the lca of the nodes that are OGs
+    # taxid_dups_og, set with the lca of the nodes that are OGs
     taxid_dups_og = set()
     #total_mems_in_ogs = set()
 
@@ -39,7 +37,7 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
                 if n.name!= node.name:
                     dups_under_node.append(n)
 
-            #There are more dups under the node
+            # There are more dups under the node
             if len(dups_under_node) > 0:
 
                 lca_target = node.props.get('lca_node')
@@ -48,8 +46,8 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
                 dups_under_ch1 = list(node.children[0].search_nodes(evoltype_2='D', lca_node=lca_target))
                 dups_under_ch2 = list(node.children[1].search_nodes(evoltype_2='D', lca_node=lca_target))
 
-                save_dups_ch1 = 0 #defaultdict(int)
-                save_dups_ch2 = 0 #defaultdict(int)
+                save_dups_ch1 = 0 
+                save_dups_ch2 = 0 
 
 
                 # Check that dups under child1 and child2 (that have the same lca) fit all requirements : species overlap min requirement,
@@ -65,33 +63,33 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
                         save_dups_ch2 += 1
 
                 if save_dups_ch1 == 0:
-                    #annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch1', taxonomy_db)
                     annotate_dups_ch(taxid_dups_og, node, 'ch1', taxonomy_db)
 
                 if save_dups_ch2 == 0 :
-                    #annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
                     annotate_dups_ch(taxid_dups_og ,node, 'ch2', taxonomy_db)
 
 
-
             elif len(dups_under_node) == 0:
-                # annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch1', taxonomy_db)
-                # annotate_dups_ch(total_mems_in_ogs, taxid_dups_og,node, 'ch2', taxonomy_db)
                 annotate_dups_ch(taxid_dups_og, node, 'ch1', taxonomy_db)
                 annotate_dups_ch(taxid_dups_og, node, 'ch2', taxonomy_db)
 
 
-    lca_root = int(t.props.get('lca_node'))
+
+    # Now decide if root is OG or not
+    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            lca_root = int(t.props.get('lca_node'))
+    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            lca_root = (t.props.get('lca_node'))
+
+    
     if len(list(t.search_nodes(evoltype_2='D', lca_node=lca_root))) == 0:
         t.add_prop('node_is_og', 'True')
-        #total_mems_in_ogs.update(set(t.props.get('_leaves_in')))
-
+        
     t, props = utils.run_clean_properties(t)
 
-    #return t, total_mems_in_ogs, taxid_dups_og
     return t, taxid_dups_og
 
-#def annotate_dups_ch(total_mems_in_ogs, taxid_dups_og, node, ch_node, taxonomy_db):
+
 def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
 
     """
@@ -118,18 +116,22 @@ def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
         target_node.add_prop('node_is_og', 'True')
         target_node.add_prop('lca_dup', node.props.get('lca_node'))
         target_node.add_prop('so_score_dup', node.props.get('so_score'))
-        target_node.add_prop('dup_lineage', list(taxonomy_db.get_lineage(node.props.get('lca_node'))))
-        #target_node.add_prop('_mems_og', '|'.join(list((og_ch_mems))))
+
+        
+        #if node.props.get('lca_node') != 'r_root':
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            target_node.add_prop('dup_lineage', list(taxonomy_db.get_lineage(node.props.get('lca_node'))))
+        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            target_node.add_prop('dup_lineage', list(taxonomy_db.get_name_lineage([node.props.get('lca_node')])[0][node.props.get('lca_node')]))
+        # else:
+            # target_node.add_prop('dup_lineage', ['r_root'])
+
+
         target_node.add_prop('_dup_node_name', node.props.get('name'))
 
         taxid_dups_og.add(node.props.get('lca_node'))
         node.add_prop('node_create_og', 'True')
-        # sp_in_og = target_node.props.get('_sp_in')
-        # sp_in_anc_og = node.props.get('_sp_in')
-
-        #total_mems_in_ogs.update(set(og_ch_mems))
-
-
+        
 
 
 

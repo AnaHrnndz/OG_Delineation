@@ -20,37 +20,38 @@ def run_outliers_and_scores(t_nw, taxonomy_db, NUM_TOTAL_SP, level2sp_mem, args)
 
     print('\n'+'2. Detect outlierts and get scores')
     print(' -Outliers thresholds:')
-    print('\tNode: '+ str(args.outliers_node))
-    print('\tReftree: '+ str(args.outliers_reftree))
+    print('\t'+'Node: '+ str(args.outliers_node))
+    print('\t'+'Reftree: '+ str(args.outliers_reftree))
     print(' -Species losses percentage threshold: ' + str(args.sp_loss_perc))
 
     t = PhyloTree(t_nw)
 
     CONTENT = t.get_cached_content()
-
+   
     t.add_prop('is_root', str('True'))
 
-    long_leaves = detect_long_branches(t)
-    if args.user_taxonomy_counter:
-        root_outliers = root_taxono_outliers(t, NUM_TOTAL_SP, level2sp_mem)
-    else:
-        root_outliers = set()
-
-    sp_in_root = t.species
-
-
+    sp_in_root = [l.props.get('taxid') for l in t]
     t.add_prop('_sp_in', sp_in_root)
+
+    # Detect long branches
+    long_leaves = detect_long_branches(t)
+    
+    # if args.user_taxonomy_counter:
+        # root_outliers = root_taxono_outliers(t, NUM_TOTAL_SP, level2sp_mem)
+    # else:
+    #    root_outliers = set()    
 
     for n in t.traverse("preorder"):
 
-        n.del_prop('named_lineage')
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            n.del_prop('named_lineage')
+        
         n.del_prop('_speciesFunction')
 
         if n.is_leaf:
             n.add_prop('lca_node', n.props.get('taxid'))
 
         else:
-
             n.add_prop('old_lca_name',(n.props.get('sci_name')))
 
             #DETECT OUTLIERS
@@ -62,7 +63,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, NUM_TOTAL_SP, level2sp_mem, args)
 
             #Add outliers from upper nodes
             if args.inherit_out == 'Yes':
-                sp_out.update(root_outliers)
+                #sp_out.update(root_outliers)
                 sp_out_inherit = add_upper_outliers(n, CONTENT)
                 sp_out.update(sp_out_inherit)
 
@@ -172,18 +173,10 @@ def run_outliers_and_scores(t_nw, taxonomy_db, NUM_TOTAL_SP, level2sp_mem, args)
             lin_lca = n.props.get('lineage')
             lca_node = n.props.get('lca_node')
 
-            if 2 in lin_lca:
-                so_2_use = args.so_bact
-            elif 2759 in lin_lca:
-                so_2_use = args.so_euk
-            elif 2157 in lin_lca:
-                so_2_use = args.so_arq
-            elif lca_node == 131567:
-                so_2_use = args.so_cell_org
-            else:
-                so_2_use = 0.1
-
+            so_2_use = utils.get_so2use(taxonomy_db, lin_lca, args)
+        
             if so_score >= so_2_use:
+                
                 if float(n.props.get('species_losses_percentage')) > args.sp_loss_perc:
                     n.add_prop('evoltype_2', 'FD')
                 else:
@@ -199,7 +192,7 @@ def detect_long_branches(t):
 
     """
         Detect leaves with long branches
-        Long branches leaves are when a leave's branch is 10 times bigger than the mean of the branches for the whole tree
+        Long branches leaves are when a leave's branch is 50 times bigger than the mean of the branches for the whole tree
         Remove entire nodes do not perform well when basal branches are too large (ex Phou fam)
     """
 
@@ -222,16 +215,15 @@ def detect_long_branches(t):
 
     return long_leaves
 
-def root_taxono_outliers(t, NUM_TOTAL_SP, level2sp_mem):
-    root_outliers = set()
+# def root_taxono_outliers(t, NUM_TOTAL_SP, level2sp_mem):
+    # root_outliers = set()
+    # for taxid in ['2', '2759', '2157']:
 
-    for taxid in ['2', '2759', '2157']:
+        # if taxid in level2sp_mem.keys():
+            # if (len(level2sp_mem[taxid])/ NUM_TOTAL_SP) < 0.1:
+                # root_outliers.update(level2sp_mem[taxid])
 
-        if taxid in level2sp_mem.keys():
-            if (len(level2sp_mem[taxid])/ NUM_TOTAL_SP) < 0.1:
-                root_outliers.update(level2sp_mem[taxid])
-
-    return root_outliers
+    # return root_outliers
 
 def add_upper_outliers(n, CONTENT):
 
@@ -245,34 +237,19 @@ def add_upper_outliers(n, CONTENT):
         for sp in sp_out_up:
             if (sp) in [leaf.props.get('taxid') for leaf in CONTENT[n]]:
                 sp_out_inherit.add(sp)
+    
     return sp_out_inherit
 
 def outliers_detection(n, outliers_node, outliers_reftree, CONTENT, level2sp_mem, sp_out_up, taxonomy_db):
 
     """
         Detect outliers for each taxid from lineages
-
-        - outliers_node: default 0.01
-        - outliers_reftree: default 0.05
-
-        The algorithm traverse the taxonomy counter created for the node.
-        Only get outliers two taxonomical levels (depht) below node lca
-            -> If node is metazoa, outlierts will be evaluated in Eumetazoa, Porifera... and Bilateria, Cnidaria etc
-            -> Outliers wont be evaluated for level such as Mammalia, Gnathostomata, etc
-                    Example: cellular organisms; Eukaryota; Opisthokonta; Metazoa; Eumetazoa; Bilateria; Deuterostomia; Chordata; Craniata; Vertebrata
-
-            Calculate:
-                - per_node: Percentage of lineage in the node. How important is the lineage in comparison with all species that are present in the node
-                - per_tree: Percentage of lineage in reference species tree. How well represented is the lineage in the node in comparison with the same lineage in the reftree
-
-            If a lineage in the node is below 1% and below 5% in the reftree, remove that species, that means:
-                1. The the species in that lineage are rare in the node (below 1%)
-                    Few porifera species inside a node with all bilateria species
-                2. There are few species representatives from reftree at that taxonomic level (below 5%)
-                    There are 2 porifera species but in reftree there are 2000 porifera species -> 2/200=0.01
-                    Taxonomic level that are rare in reftree (just 1 or 2 species of one lineage), will be preserved.
-                        If in the reftree you have two cnidaria, you always keeps cnidaria species -> 1/2=0.5
-
+        1. Create taxonomy counter for the node -> sp_per_level
+        2. Select the best taxonomic level for the node. Best level its the most recent level that represent >90% sp in the node
+        3. For the sp that do not belong to the best tax level (candidates2remove), check if are outliers or not: 
+            for each sp in candidates2remove, get the lineage, for each taxlev in the lineage calculate:
+                sp_in_tree
+                lin_in_tree
     """
 
 
@@ -285,15 +262,25 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT, level2sp_mem
         if l.props.get('taxid') not in sp_out_up:
             sp_in_node.add(l.props.get('taxid'))
 
-            for tax in l.props.get('lineage').split('|'):
-                sp_per_level[tax].add(str(l.props.get('taxid')))
+            if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+                for tax in l.props.get('lineage').split('|'):
+                    sp_per_level[tax].add(str(l.props.get('taxid')))
+            elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
+                for tax in l.props.get('named_lineage').split('|'):
+                    sp_per_level[tax].add(str(l.props.get('taxid')))
 
 
+    # Select best taxonomic level for the node. 
+    # Best level its the most recent level that represent >90% sp in the node
     best_tax = str()
     ptax = defaultdict(dict)
-
+    
     for tax, num in sp_per_level.items():
-        depth_tax = len(taxonomy_db.get_lineage(tax))
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            depth_tax = len(taxonomy_db.get_lineage(tax))
+        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
+            depth_tax = len(taxonomy_db.get_name_lineage([tax])[0][tax])
+
         perc_tax_in_node = len(num)/len(sp_in_node)
         ptax[depth_tax][tax] = perc_tax_in_node
 
@@ -316,23 +303,33 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT, level2sp_mem
     else:
         n.add_prop('best_tax', 'NO LEAVES')
 
+
+    # For the sp that do not belong to the best tax level, check if are outliers or not
     sp_keep = sp_per_level[best_tax]
     candidates2remove = sp_in_node.difference(sp_keep)
     sp2remove = set()
 
     for sp in candidates2remove:
-        for l in taxonomy_db.get_lineage(sp):
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            lin2use =taxonomy_db.get_lineage(sp)
+        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            lin2use = taxonomy_db.get_name_lineage([sp])[0][sp]
+        
+        for l in lin2use:
 
-            # Representacion de esa especie para cada taxid de su linaje en el arbol, si es una sp que tiene pocos representantes en el arbol sp_in_tree~1.
+            # this rule prevent for remove strange lineages with few representatives in the tree
+            # for each taxlev of the species, check how specific is that taxlev in the tree,
+            # if taxlev has few representatives in the tree (close to 1), then sp_in_tree ~1
             sp_in_tree = 1/len(level2sp_mem[(str(l))])
 
-            # Representacion del linaje en el nodo, en comparacion con el linaje en el arbol. Si ese linaje contiene casi todos los representantes del linaje en el arbol, lin_in_tree~1
+            # For the lineage, how well represented is in the node in comparison with the whole tree
+            # if lineage has almost all species lin_in_tree~1, if not lin_in_tree~0
             lin_in_tree = len(sp_per_level[str(l)]) / len(level2sp_mem[(str(l))])
 
             if sp_in_tree < 0.05 and lin_in_tree <0.05:
                 sp2remove.add(sp)
                 break
-
+    
     return sp2remove
 
 def update_taxonomical_props(n, sp_in, taxonomy_db):
@@ -343,22 +340,36 @@ def update_taxonomical_props(n, sp_in, taxonomy_db):
 
     if len(sp_in) > 0:
         lca_node = get_lca_node(sp_in, taxonomy_db)
-        rank = utils.clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
-        lin_lca = taxonomy_db.get_lineage(lca_node)
-        n.add_prop('lineage', lin_lca)
-        n.add_prop('taxid', lca_node)
-    elif len(sp_in) == 0:
-        lca_node = 1
-        rank = utils.clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
-        lin_lca = taxonomy_db.get_lineage(lca_node)
-        n.add_prop('lineage', lin_lca)
-        n.add_prop('taxid', lca_node)
+        
+        if lca_node == 'r_root':
+            lin_lca = ['r_root']
+            rank = ['r_root']
 
-    n.add_prop('lca_node', lca_node)
-    lca_node_name = taxonomy_db.get_taxid_translator([lca_node])[lca_node]
-    n.add_prop('lca_node_name', lca_node_name.replace(":", ""))
-    n.props['sci_name'] = n.props.get('lca_node_name')
-    n.add_prop('rank', rank)
+        else:
+            if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+                rank = utils.clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
+                lin_lca = taxonomy_db.get_lineage(lca_node)
+                lca_node_name = taxonomy_db.get_taxid_translator([lca_node])[lca_node]
+            elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+                rank = utils.get_gtdb_rank(lca_node)
+                lin_lca = taxonomy_db.get_name_lineage([lca_node])[0][lca_node]
+                lca_node_name = lca_node
+
+        n.add_prop('lineage', lin_lca)
+        n.add_prop('taxid', lca_node)
+        n.add_prop('lca_node', lca_node)
+        n.add_prop('lca_node_name', lca_node_name.replace(":", ""))
+        n.add_prop('rank', rank)
+        n.props['sci_name'] = n.props.get('lca_node_name')
+    
+    elif len(sp_in) == 0:
+    
+        n.add_prop('lineage', ['Empty'])
+        n.add_prop('taxid', 'Empty')
+        n.add_prop('lca_node', 'Empty')
+        n.add_prop('lca_node_name', 'Empty')
+        n.add_prop('rank', 'Empty')
+        n.props['sci_name'] = n.props.get('Empty')
 
 def get_lca_node(sp_list, taxonomy_db):
 
@@ -370,12 +381,20 @@ def get_lca_node(sp_list, taxonomy_db):
     nspecies = 0
     for sp in sp_list:
         nspecies += 1
-        lineages.update(taxonomy_db.get_lineage(sp))
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            lineages.update(taxonomy_db.get_lineage(sp))
+        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            lineages.update(taxonomy_db.get_name_lineage([sp])[0][sp])
 
     lca = [l for l, count in lineages.items() if count == nspecies]
+    
     if not lca:
         lca = ['Unk']
 
+    # if lca[-1] == 'root':
+        # lca[-1] = 'r_root'
+
+    
     return lca[-1]
 
 def get_inparalogs_rate(leaf_targets):
@@ -419,7 +438,7 @@ def get_dup_score(n):
     minval = int(np.min(a[np.nonzero(a)]))
 
     dup_score = float(len(sp1 & sp2) / minval)
-
+    
     return dup_score
 
 def best_lin_lost(expected_sp, found_sp, taxonomy_db):
@@ -427,20 +446,35 @@ def best_lin_lost(expected_sp, found_sp, taxonomy_db):
     diff_sp = expected_sp.difference(found_sp)
 
     sp_lost_per_level = defaultdict(set)
+    
     for sp in diff_sp:
-        for tax in taxonomy_db.get_lineage(sp):
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            lin2use =taxonomy_db.get_lineage(sp)
+        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            lin2use = taxonomy_db.get_name_lineage([sp])[0][sp]
+        
+        for tax in lin2use:
             sp_lost_per_level[tax].add(sp)
-
 
     sp_exp_per_level = defaultdict(set)
     for sp in expected_sp:
-        for tax in taxonomy_db.get_lineage(sp):
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            lin2use =taxonomy_db.get_lineage(sp)
+        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            lin2use = taxonomy_db.get_name_lineage([sp])[0][sp]
+        
+        for tax in lin2use:
+            
             sp_exp_per_level[tax].add(sp)
 
     ptax = defaultdict(dict)
     for tax, num in sp_lost_per_level.items():
-        depth_tax = len(taxonomy_db.get_lineage(tax))
-        perc_tax_in_node = len(num)/len(sp_exp_per_level[tax]) # ????????
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            depth_tax = len(taxonomy_db.get_lineage(sp))
+        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            depth_tax = len(taxonomy_db.get_name_lineage([sp])[0][sp])
+        
+        perc_tax_in_node = len(num)/len(sp_exp_per_level[tax]) 
         ptax[depth_tax][tax] = perc_tax_in_node
 
     depths_list = (list(ptax.keys()))
@@ -449,13 +483,11 @@ def best_lin_lost(expected_sp, found_sp, taxonomy_db):
     best_loss = defaultdict(dict)
 
     for depth in depths_list:
-
         if depth not in [1, 2]:
             for tax, perc in ptax[depth].items():
 
                 if  perc >=0.80:
                     best_loss[depth][tax] = perc
-
 
     return best_loss
 
@@ -463,12 +495,21 @@ def sp_lost_v2(n, level2sp_mem):
 
     lca_node = str(n.props.get('lca_node'))
     sp_in = set(n.props.get('_sp_in'))
-    expected_sp = set(level2sp_mem[lca_node])
 
-    diff_sp = expected_sp.difference(sp_in)
-    perc_diff_sp = len(diff_sp) / len(expected_sp)
+    expected_sp = set(level2sp_mem[lca_node])
+    
+
+    if len(sp_in) == 0 or len(expected_sp) == 0:
+        diff_sp = expected_sp.difference(sp_in)
+        perc_diff_sp = 1.0
+    else:
+        diff_sp = expected_sp.difference(sp_in)
+        perc_diff_sp = len(diff_sp) / len(expected_sp)
+
+   
 
     n.add_prop('species_losses', len(diff_sp))
     n.add_prop('species_losses_percentage', perc_diff_sp)
 
+    
 

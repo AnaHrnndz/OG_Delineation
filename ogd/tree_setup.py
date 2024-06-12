@@ -1,15 +1,13 @@
 import subprocess
-from ete4 import  PhyloTree
+from ete4 import  PhyloTree, GTDBTaxa
 import utils
 import re
 
 ## 2. Preanalysis - Tree setup  ##
 
-
-
 chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
-def run_setup(t, name_tree, taxonomy_db, rooting, path_out, abs_path):
+def run_setup(t, name_tree, taxonomy_db, rooting, path_out, abs_path, sp_delimitator):
 
 
     """
@@ -25,7 +23,10 @@ def run_setup(t, name_tree, taxonomy_db, rooting, path_out, abs_path):
 
     t.resolve_polytomy()
 
-    t = run_rooting(t, rooting, path_out, abs_path)
+    t = check_branch_legth(t)
+
+    
+    t = run_rooting(t, rooting, taxonomy_db, path_out, abs_path, sp_delimitator)
 
     t = add_taxomical_annotation(t, taxonomy_db)
 
@@ -49,7 +50,23 @@ def run_setup(t, name_tree, taxonomy_db, rooting, path_out, abs_path):
 
     return tree_nw, set_sp_total, total_mems_in_tree, NUM_TOTAL_SP, props
 
-def run_rooting(t, rooting,  path_out, abs_path):
+
+
+def check_branch_legth(t):
+    lenghts = list()
+    for n in t.traverse():
+        if n.dist != None:
+            lenghts.append(n.dist)
+
+    if (all(v == 0.0 for v in lenghts)) == True:
+        for n in t.traverse():
+            if n.dist != None:
+                n.dist = 1.0
+
+    return t
+
+
+def run_rooting(t, rooting,  taxonomy_db, path_out, abs_path, sp_delimitator):
 
     """
         Tree rooting.
@@ -59,11 +76,14 @@ def run_rooting(t, rooting,  path_out, abs_path):
     if  rooting == "Midpoint":
         print(' -Run midpoint rooting')
         root_mid = t.get_midpoint_outgroup()
-        t.set_outgroup(root_mid)
+        try:
+            t.set_outgroup(root_mid)
+        except:
+            print('Error in Midpoint')
 
     elif rooting == "MinVar":
         print(' -Run MinVar rooting')
-        t = run_minvar(t,path_out, abs_path)
+        t = run_minvar(t, taxonomy_db, path_out, abs_path, sp_delimitator)
 
     else:
         print(' -No rooting')
@@ -72,22 +92,17 @@ def run_rooting(t, rooting,  path_out, abs_path):
 
     return t
 
-def run_minvar(t, path_out, abs_path):
+def run_minvar(t, taxonomy_db, path_out, abs_path, sp_delimitator):
 
     path2tree = abs_path
     path2tmptree = path_out+'/tmp_tree.nw'
 
-    # subprocess.run(("python /data/soft/FastRoot/MinVar-Rooting/FastRoot.py -i %s -o %s" \
-        # %(path2tree, path2tmptree)), shell = True)
-
     subprocess.run(("FastRoot.py -i %s -o %s" \
         %(path2tree, path2tmptree)), shell = True)
 
-    #t = load_tree_local(tree = path2tmptree)
-
     t_minvar = PhyloTree(open(path2tmptree), parser = 0)
-    t_minvar.set_species_naming_function(utils.parse_taxid)
 
+    t_minvar.set_species_naming_function(lambda node: node.name.split(sp_delimitator)[0])
 
     return t_minvar
 
@@ -98,9 +113,13 @@ def add_taxomical_annotation(t, taxonomy_db):
         Parsing function used to extract species name from a node’s name.
     """
 
+    
     # Adding additional information to any internal a leaf node (sci_name, taxid, named_lineage, lineage, rank)
-    taxonomy_db.annotate_tree(t,  taxid_attr="species")
 
+    
+    taxonomy_db.annotate_tree(t,  taxid_attr="species") 
+        
+        
     return t
 
 def make_name(i):

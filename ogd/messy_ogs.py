@@ -98,7 +98,14 @@ def new_mog(c, messy_ogs, ch, taxonomy_db, seqs_in_messy_ogs, lca_target, diff):
 
     messy_ogs[name] = defaultdict()
     messy_ogs[name]['TaxoLevel'] = str(lca_target)
-    messy_ogs[name]['SciName_TaxoLevel'] = taxonomy_db.get_taxid_translator([lca_target])[lca_target]
+    if lca_target == 'r_root':
+        messy_ogs[name]['SciName_TaxoLevel'] = 'r_root'
+    else:
+        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            messy_ogs[name]['SciName_TaxoLevel'] = taxonomy_db.get_taxid_translator([lca_target])[lca_target]
+        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            messy_ogs[name]['SciName_TaxoLevel'] = lca_target
+        
     messy_ogs[name]['AssocNode'] = ch.name
     messy_ogs[name]['OG_down'] = set()
     messy_ogs[name]['OG_up'] = set()
