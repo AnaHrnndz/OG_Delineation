@@ -31,7 +31,8 @@ def run_outliers_and_scores(t_nw, taxonomy_db, NUM_TOTAL_SP, level2sp_mem, args)
     t.add_prop('is_root', str('True'))
 
     sp_in_root = [l.props.get('taxid') for l in t]
-    t.add_prop('_sp_in', sp_in_root)
+    t.add_prop('sp_in', sp_in_root)
+    
 
     # Detect long branches
     long_leaves = detect_long_branches(t)
@@ -73,6 +74,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, NUM_TOTAL_SP, level2sp_mem, args)
 
             sp_out.update(outliers_detection(n, args.outliers_node, args.outliers_reftree, CONTENT, level2sp_mem, sp_out, taxonomy_db))
 
+            
             #   Save info for children_node_1
             ch1_name = n.children[0].props.get('name')
             ch1_leaf_names = list(ch1.leaf_names())
@@ -106,34 +108,36 @@ def run_outliers_and_scores(t_nw, taxonomy_db, NUM_TOTAL_SP, level2sp_mem, args)
                         sp_ch2.add(str(l.props.get('taxid')))
                         leaves_ch2.add(l.props.get('name'))
 
-
+           
             #   Re-calculate species overlap after detect outliers
             overlaped_spces = set(sp_ch1 & sp_ch2)
 
             if len(overlaped_spces)>0:
                 so_score = float(len(overlaped_spces) / len(sp_in))
-                n.add_prop('_overlap', list(overlaped_spces))
+                n.add_prop('overlap', list(overlaped_spces))
             else:
                 so_score = 0.0
 
             #   Update last common ancestor, rank and lineage for the node after detect outliers
             update_taxonomical_props(n, sp_in, taxonomy_db)
 
+
+            
             #   Save properties
-            n.add_prop('_sp_in', sp_in)
+            n.add_prop('sp_in', sp_in)
             n.add_prop('len_sp_in', len(sp_in))
-            n.add_prop('_sp_in_ch1', sp_ch1)
-            n.add_prop('_sp_in_ch2', sp_ch2)
-            n.add_prop('_ch1_name', ch1_name)
-            n.add_prop('_ch2_name', ch2_name)
-            n.add_prop('_leaves_in', leaves_in)
-            n.add_prop('_leaves_in_nodes', leaves_in_nodes)
+            n.add_prop('sp_in_ch1', sp_ch1)
+            n.add_prop('sp_in_ch2', sp_ch2)
+            n.add_prop('ch1_name', ch1_name)
+            n.add_prop('ch2_name', ch2_name)
+            n.add_prop('leaves_in', leaves_in)
+            n.add_prop('leaves_in_nodes', leaves_in_nodes)
             n.add_prop('total_leaves', len(n))
             n.add_prop('len_leaves_in', len(leaves_in))
             n.add_prop('len_leaves_out', len(leaves_out))
-            n.add_prop('_leaves_ch1',list(leaves_ch1))
-            n.add_prop('_leaves_ch2',list(leaves_ch2))
-            n.add_prop('_leaves_out', list(leaves_out))
+            n.add_prop('leaves_ch1',list(leaves_ch1))
+            n.add_prop('leaves_ch2',list(leaves_ch2))
+            n.add_prop('leaves_out', list(leaves_out))
             n.add_prop('so_score', so_score)
             if len(sp_out) == 0:
                 n.add_prop('sp_out', ['None'])
@@ -164,7 +168,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, NUM_TOTAL_SP, level2sp_mem, args)
             #lin_lost_from_root = best_lin_lost(expected_sp=sp_in_root, found_sp=sp_in, taxonomy_db=taxonomy_db)
             #n.add_prop('lost_from_root', lin_lost_from_root)
             if n.up:
-                sp_in_pnode = n.up.props.get('_sp_in')
+                sp_in_pnode = n.up.props.get('sp_in')
                 lin_lost_from_pnode = best_lin_lost(expected_sp=sp_in_pnode, found_sp=sp_in, taxonomy_db=taxonomy_db)
                 n.add_prop('lost_from_uppernode', lin_lost_from_pnode)
 
@@ -201,11 +205,11 @@ def detect_long_branches(t):
     for n in t.traverse():
         if n.is_leaf:
             length_leaves.append(n.dist)
+            total_dist.append(n.dist)
         else:
             total_dist.append(n.dist)
 
     mean_length = np.mean(total_dist)
-
     long_leaves = set()
     for l in t:
         if l.dist > mean_length*50:
@@ -254,6 +258,7 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT, level2sp_mem
 
 
     sp_in_node = set()
+    
 
     # Create taxonomy counter for the node. For each lineage that its present in the node, count how many species there are in the node
     sp_per_level = defaultdict(set)
@@ -269,7 +274,7 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT, level2sp_mem
                 for tax in l.props.get('named_lineage').split('|'):
                     sp_per_level[tax].add(str(l.props.get('taxid')))
 
-
+    
     # Select best taxonomic level for the node. 
     # Best level its the most recent level that represent >90% sp in the node
     best_tax = str()
@@ -308,6 +313,7 @@ def outliers_detection(n, outliers_node, outliers_reftree, CONTENT, level2sp_mem
     sp_keep = sp_per_level[best_tax]
     candidates2remove = sp_in_node.difference(sp_keep)
     sp2remove = set()
+    
 
     for sp in candidates2remove:
         if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
@@ -363,6 +369,8 @@ def update_taxonomical_props(n, sp_in, taxonomy_db):
         n.props['sci_name'] = n.props.get('lca_node_name')
     
     elif len(sp_in) == 0:
+
+
     
         n.add_prop('lineage', ['Empty'])
         n.add_prop('taxid', 'Empty')
@@ -428,8 +436,8 @@ def get_dup_score(n):
        Suplication score use the number of species of the children node with less species.
     """
 
-    sp1 = n.props.get('_sp_in_ch1')
-    sp2 = n.props.get('_sp_in_ch2')
+    sp1 = n.props.get('sp_in_ch1')
+    sp2 = n.props.get('sp_in_ch2')
 
     if len(sp1) == 0 and len(sp2) == 0:
         return 0
@@ -494,7 +502,7 @@ def best_lin_lost(expected_sp, found_sp, taxonomy_db):
 def sp_lost_v2(n, level2sp_mem):
 
     lca_node = str(n.props.get('lca_node'))
-    sp_in = set(n.props.get('_sp_in'))
+    sp_in = set(n.props.get('sp_in'))
 
     expected_sp = set(level2sp_mem[lca_node])
     

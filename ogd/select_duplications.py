@@ -29,7 +29,7 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
 
 
         if not node.is_leaf and node.props.get('evoltype_2') == 'D'  \
-        and len(node.props.get('_leaves_in')) >1 and len(node.props.get('_sp_in')) > 1 :
+        and len(node.props.get('leaves_in')) >1 and len(node.props.get('sp_in')) > 1 :
 
             dups_under_node = []
             for n in node.search_nodes(evoltype_2='D'):
@@ -54,12 +54,12 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
                 # more than 1 leaves and more than 1 species
 
                 for n_ in  dups_under_ch1:
-                    if len(n_.props.get('_leaves_in')) >1 and len(n_.props.get('_sp_in'))> 1 :
+                    if len(n_.props.get('leaves_in')) >1 and len(n_.props.get('sp_in'))> 1 :
                         save_dups_ch1 += 1
 
 
                 for n_ in  dups_under_ch2:
-                    if  len(n_.props.get('_leaves_in'))>1 and len(n_.props.get('_sp_in'))> 1 :
+                    if  len(n_.props.get('leaves_in'))>1 and len(n_.props.get('sp_in'))> 1 :
                         save_dups_ch2 += 1
 
                 if save_dups_ch1 == 0:
@@ -77,9 +77,9 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
 
     # Now decide if root is OG or not
     if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-            lca_root = int(t.props.get('lca_node'))
+        lca_root = int(t.props.get('lca_node'))
     elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-            lca_root = (t.props.get('lca_node'))
+        lca_root = (t.props.get('lca_node'))
 
     
     if len(list(t.search_nodes(evoltype_2='D', lca_node=lca_root))) == 0:
@@ -101,15 +101,15 @@ def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
     """
 
     if ch_node == 'ch1':
-        og_name_ch = node.props.get('_ch1_name')
-        og_ch_mems = node.props.get('_leaves_ch1')
-        sp_ch = node.props.get('_sp_in_ch1')
+        og_name_ch = node.props.get('ch1_name')
+        og_ch_mems = node.props.get('leaves_ch1')
+        sp_ch = node.props.get('sp_in_ch1')
         target_node = next(node.search_nodes(name=og_name_ch))
 
     elif ch_node == 'ch2':
-        og_name_ch = node.props.get('_ch2_name')
-        og_ch_mems = node.props.get('_leaves_ch2')
-        sp_ch = node.props.get('_sp_in_ch2')
+        og_name_ch = node.props.get('ch2_name')
+        og_ch_mems = node.props.get('leaves_ch2')
+        sp_ch = node.props.get('sp_in_ch2')
         target_node = next(node.search_nodes(name=og_name_ch))
 
     if  len(sp_ch) > 1 and len(og_ch_mems) > 1:
@@ -127,7 +127,7 @@ def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
             # target_node.add_prop('dup_lineage', ['r_root'])
 
 
-        target_node.add_prop('_dup_node_name', node.props.get('name'))
+        target_node.add_prop('dup_node_name', node.props.get('name'))
 
         taxid_dups_og.add(node.props.get('lca_node'))
         node.add_prop('node_create_og', 'True')

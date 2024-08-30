@@ -11,7 +11,7 @@ def get_ogs(t, level2sp_mem, taxonomy_db):
 
     for subtree in set_trees:
 
-        all_leaves_subtree = subtree.props.get('_leaves_in')
+        all_leaves_subtree = subtree.props.get('leaves_in')
 
         lca_subtree = str(subtree.props.get('lca_dup'))
         if lca_subtree == 'None':
@@ -120,7 +120,7 @@ def get_my_descendant(level2sp_mem, taxonomy_db):
 
 def get_members(node, taxa):
 
-    all_leafs= node.props.get('_leaves_in_nodes')
+    all_leafs= node.props.get('leaves_in_nodes')
 
     mems_set = set()
     for l in all_leafs:

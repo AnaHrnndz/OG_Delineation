@@ -29,7 +29,7 @@ RECOVERY PIPELINE
 def recover_sequences(tree, t, alg, total_mems_in_tree, total_mems_in_ogs, name_tree, path_out, ogs_info, mode):
 
     name_fam = os.path.basename(tree).split('.')[0]
-    pathout = path_out+'/'+name_fam+'_aln_hmm'
+    pathout = path_out+'/'+name_fam+'aln_hmm'
     if not os.path.exists(pathout):
         os.mkdir(pathout)
     fasta = alg
@@ -120,7 +120,7 @@ def write_og_seqs_regular_mode(t, fasta, ogs_info, path_out):
             lca = str(subtree.props.get('lca_node'))
             node_name = subtree.name
             with open(path_out+'/'+node_name+'_'+lca+'.raw_fasta.faa', 'w') as f_out:
-                list_mems = list(subtree.props.get('_leaves_in'))
+                list_mems = list(subtree.props.get('leaves_in'))
                 if len(list_mems) >0:
                     for m in list_mems:
                         aa = fasta.get_seq(m)
@@ -141,7 +141,7 @@ def write_og_seqs_fast_mode(t, fasta, ogs_info, path_out):
             lca = str(subtree.props.get('lca_node'))
             node_name = subtree.name
             with open(path_out+'/'+node_name+'_'+lca+'.aln', 'w') as f_out:
-                list_mems = list(subtree.props.get('_leaves_in'))
+                list_mems = list(subtree.props.get('leaves_in'))
                 if len(list_mems) >0:
                     for m in list_mems:
                         aa = fasta.get_seq(m)

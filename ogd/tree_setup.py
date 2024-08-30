@@ -95,7 +95,7 @@ def run_rooting(t, rooting,  taxonomy_db, path_out, abs_path, sp_delimitator):
 def run_minvar(t, taxonomy_db, path_out, abs_path, sp_delimitator):
 
     path2tree = abs_path
-    path2tmptree = path_out+'/tmp_tree.nw'
+    path2tmptree = path_out+'tmp_dir/'+'minvar_tree.nw'
 
     subprocess.run(("FastRoot.py -i %s -o %s" \
         %(path2tree, path2tmptree)), shell = True)

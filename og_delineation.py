@@ -16,7 +16,7 @@ import pathlib
 
 cwd =  str(pathlib.Path(__file__).parent.resolve())
 sys.path.append(cwd+'/ogd')
-from emapper_annotate import annotate_with_emapper
+from emapper_annotate import annotate_with_emapper, annot_treeprofiler
 from recovery import recover_sequences
 import  pairs
 import utils
@@ -25,7 +25,6 @@ from outliers_scores import run_outliers_and_scores
 from select_duplications import  run_get_main_dups
 from orthologs_groups import get_ogs
 from timer import Timer
-from annot_treeprofiler import run_annot_treeprofiler
 from messy_ogs import get_messy_groups, annotate_messy_og
 
 cwd =  str(pathlib.Path(__file__).parent.resolve())
@@ -38,6 +37,19 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
 ## 1. Load initial info   ##
+
+def create_tmp(path_out):
+    path = os.path.join(path_out, 'tmp_dir') 
+  
+# Create the directory 
+# 'Nikhil' 
+    try: 
+        os.makedirs(path, exist_ok = True) 
+        print("Directory '%s' created successfully" % path) 
+    except OSError as error: 
+        print("Directory '%s' can not be created" % path)
+
+    return path 
 
 def load_tree_local(tree=None, taxonomy = None, sp_delimitator = None):
 
@@ -219,7 +231,7 @@ def add_nodes_up_down(t):
 # 7. Annotate base-OGs
 def annot_ogs(t, base_ogs, taxonomy_db):
 
-    ##OG_name   TaxoLevel   AssocNode  len_sp_in_OG OG_up   OG_down num_OG_mems    members
+    ##OG_name   TaxoLevel   AssocNode  lensp_in_OG OG_up   OG_down num_OG_mems    members
 
     annot_base_ogs = defaultdict(dict)
     total_mems_in_ogs = set()
@@ -300,7 +312,7 @@ def annotate_root(base_ogs_annot, t, name_tree, total_mems_in_tree, sp_set, tota
 
     for dup_node in t.search_nodes(node_create_og='True'):
         lca_dup = dup_node.props.get('lca_node')
-        mems_dup = set(dup_node.props.get('_leaves_in'))
+        mems_dup = set(dup_node.props.get('leaves_in'))
         lca_all_dups.add(lca_dup)
         taxlev2ogs[lca_dup].add(dup_node.name)
         taxlev2mems[lca_dup].update(mems_dup)
@@ -308,6 +320,9 @@ def annotate_root(base_ogs_annot, t, name_tree, total_mems_in_tree, sp_set, tota
     taxlev_list = []
     for taxlev, og in taxlev2ogs.items():
         
+        if isinstance(taxlev, str):
+            taxlev = int(taxlev)
+
         if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
             sci_name = taxonomy_db.get_taxid_translator([taxlev])[taxlev]
         
@@ -348,18 +363,7 @@ def flag_seqs_out_og(t, total_mems_in_ogs, total_mems_in_tree):
 
 #####   FUNCIONTS TO PREPARE OUTPUTS FILES (newick, etc)    ####
 
-def run_write_post_tree(t, name_tree, path_out, all_props):
 
-    """
-        Write newick file after the analysis
-        TODO: return nothing????
-    """
-    name_fam = name_tree.split('.',1)[0]
-
-    post_tree = path_out+'/'+name_fam+'.tree_annot.nw'
-    t.write(outfile=post_tree, props=all_props, format_root_node = True)
-
-    return
 
 
 def get_seq2og_v2(base_ogs_annot, messy_ogs):
@@ -482,8 +486,10 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
     taxonomy_db = load_taxonomy(taxonomy = taxonomy_type, user_taxonomy= user_taxo)
     reftree = load_reftree(rtree = reftree, t = t, taxonomy_db = taxonomy_db)
     level2sp_mem = load_taxonomy_counter(reftree=reftree, user_taxonomy_counter = user_counter)
+    tmp_path = create_tmp(path_out)
     
-    
+
+
     # 2. Tree setup (Pre-analysis):  resolve polytomies, rooting, ncbi annotation, etc
     t_nw , sp_set, total_mems_in_tree, NUM_TOTAL_SP, user_props = run_setup(t, name_tree, taxonomy_db, args.rooting, path_out, abs_path, args.sp_delim)
 
@@ -526,16 +532,22 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
 
 
     # 9. Optionally add annotations from emapper
+        # 9.1 Run emapper and annotate with treeprofiler
     if args.run_emapper:
-        t = annotate_with_emapper(t, args.alg, path_out)
+        t = annotate_with_emapper(t, args.alg, tmp_path)
+        
+        # 9.2 Only annotate with treeprofiler
+    if args.path2emapper_main:
+        main_table = args.path2emapper_main
+        pfam_table = args.path2emapper_pfams
+        t = annot_treeprofiler(t, args.alg, main_table, pfam_table, tmp_path)
+        
 
-    if args.path2emapper_table:
-        t = run_annot_treeprofiler(t, args.path2emapper_table, args.alg, path_out)
-
-    # 10. Optionally  get all orthologs pairs
-    if args.get_pairs:
+    # 10. Optionally skip get all orthologs pairs
+    if not args.skip_get_pairs:
         clean_pairs = pairs.get_all_pairs(CONTENT, total_mems_in_ogs)
         pairs.write_pairs_table(clean_pairs, path_out, name_tree)
+
 
     # 11. Annotate root & messy_ogs
     annotate_root(base_ogs_annot, t, name_tree, total_mems_in_tree, sp_set, total_mems_in_ogs, recovery_seqs, taxonomy_db, args)
@@ -543,7 +555,6 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
 
     # 12. Flag seqs out OGs
     total_mems_in_ogs.update(recovery_seqs)
-
     t = flag_seqs_out_og(t, total_mems_in_ogs, total_mems_in_tree)
 
     # 13. Write output files
@@ -555,7 +566,8 @@ def run_app(tree, abs_path, name_tree, reftree, user_counter, user_taxo, taxonom
     write_seq2ogs(seq2ogs, path_out,  name_tree)
 
     t, all_props = utils.run_clean_properties(t)
-    run_write_post_tree(t, name_tree, path_out, all_props)
+
+    utils.run_write_post_tree(t, name_tree, path_out, all_props)
 
 
 def get_args():
@@ -579,9 +591,10 @@ def get_args():
     parser.add_argument('--user_taxonomy_counter')
     parser.add_argument('--reftree')
     parser.add_argument('--run_emapper', action='store_true')
-    parser.add_argument('--run_treeprofiler', dest='path2emapper_table')
+    parser.add_argument('--run_treeprofiler_emapper_annotation', dest='path2emapper_main')
+    parser.add_argument('--run_treeprofiler_emapper_pfams', dest='path2emapper_pfams')
     parser.add_argument('--run_recovery', action='store_true')
-    parser.add_argument('--get_pairs', action='store_true')
+    parser.add_argument('--skip_get_pairs', action='store_true')
     parser.add_argument('--sp_delimitator', dest = 'sp_delim', default='-')
 
 

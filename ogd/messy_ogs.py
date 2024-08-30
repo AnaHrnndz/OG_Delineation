@@ -20,12 +20,12 @@ def get_messy_groups(t, taxonomy_db):
 
             else:
                 for ch in n.children:
-                    all_mems = ch.props.get('_leaves_in', set())
+                    all_mems = ch.props.get('leaves_in', set())
                     mem2remove = set()
                     nodes2ckech = set(ch.search_nodes(node_is_og='True', lca_dup=lca_target))
                     nodes2ckech.update(ch.search_nodes(evoltype_2='D', lca_node=lca_target))
                     for n_ in nodes2ckech:
-                        mem2remove.update(n_.props.get('_leaves_in'))
+                        mem2remove.update(n_.props.get('leaves_in'))
 
                     diff = all_mems.difference(mem2remove)
                     if  len(diff)>1:
@@ -41,12 +41,12 @@ def get_messy_groups(t, taxonomy_db):
                 else:
 
                     for ch in n.children:
-                        all_mems = ch.props.get('_leaves_in', set())
+                        all_mems = ch.props.get('leaves_in', set())
                         mem2remove = set()
                         nodes2ckech = set(ch.search_nodes(node_is_og='True', lca_dup=lca_target))
                         nodes2ckech.update(ch.search_nodes(evoltype_2='D', lca_node=lca_target))
                         for n_ in nodes2ckech:
-                            mem2remove.update(n_.props.get('_leaves_in'))
+                            mem2remove.update(n_.props.get('leaves_in'))
 
                         diff = all_mems.difference(mem2remove)
                         if  len(diff)>1:
@@ -113,7 +113,7 @@ def new_mog(c, messy_ogs, ch, taxonomy_db, seqs_in_messy_ogs, lca_target, diff):
 
     for lname in diff:
 
-        if lname not in ch.props.get('_leaves_out'):
+        if lname not in ch.props.get('leaves_out'):
             old_mOG = ch[lname].props.get('mOG', str())
             new_mOG = old_mOG+'@'+name
             ch[lname].add_prop('mOG', new_mOG)

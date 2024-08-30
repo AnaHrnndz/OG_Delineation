@@ -1,7 +1,10 @@
 import random
 import subprocess
 from collections import defaultdict
-from ete4 import SeqGroup
+from ete4 import SeqGroup, PhyloTree
+import glob
+import utils
+
 
 """
 EMAPPER ANNOTATION
@@ -9,21 +12,23 @@ EMAPPER ANNOTATION
 """
 
 
-def annotate_with_emapper(t, alg, path_out):
+def annotate_with_emapper(t, alg, tmp_path):
     """"
         Add to the leaves of tree t the information coming from emapper
         and return the annotated tree.
     """
     # In the main program, we are actually only interested in annotations
     # the pfam domains, but we have to take it all from emapper.
-    path2raw = alg2rawfasta(alg, path_out)
+    path2raw = alg2rawfasta(alg, tmp_path)
 
-    path2main_table = run_emapper(path2raw, path_out)
-    path2pfam_table = run_hmm_mapper(path2raw, path_out)
+    path2main_table = run_emapper(path2raw, tmp_path)
+    path2pfam_table = run_hmm_mapper(path2raw, tmp_path)
 
-    t = annot_tree_pfam_table(t, path2pfam_table, alg)
+    t = annot_treeprofiler(t, alg, path2main_table, path2pfam_table, tmp_path)
 
-    t = annot_tree_main_table(t, path2main_table)
+    # t = annot_tree_pfam_table(t, path2pfam_table, alg)
+
+    # t = annot_tree_main_table(t, path2main_table)
 
     # TODO: Check if we really do not need this (because it
     # is done in the main function already?):
@@ -32,10 +37,10 @@ def annotate_with_emapper(t, alg, path_out):
 
     return t
 
-def alg2rawfasta(alg, path_out):
+def alg2rawfasta(alg, tmp_path):
 
     fasta = SeqGroup(alg)
-    path2raw = path_out+'/total_raw_fasta.faa'
+    path2raw = tmp_path+'/total_raw_fasta.faa'
     raw_fasta = open(path2raw, 'w')
     for num, (name, aa, _) in enumerate(fasta):
         clean_aa = aa.replace('-','')
@@ -45,7 +50,7 @@ def alg2rawfasta(alg, path_out):
     return path2raw
 
 
-def run_emapper(path2raw, path_out):
+def run_emapper(path2raw, tmp_path):
 
     """
         Run eggnog-mapper:
@@ -58,15 +63,15 @@ def run_emapper(path2raw, path_out):
 
     subprocess.run(("python /data/soft/eggnog-mapper_2.1.12/eggnog-mapper/emapper.py --sensmode fast  \
         --data_dir /data/soft/eggnog-mapper_2.1.12/eggnog-mapper/data  \
-        -i %s -o %s --output_dir %s" %(path2raw, 'result_emapper', path_out)), shell = True)
+        -i %s -o %s --output_dir %s" %(path2raw, 'result_emapper', tmp_path)), shell = True)
 
 
-    path2main_table = path_out+'/result_emapper.emapper.annotations'
+    path2main_table = tmp_path+'/result_emapper.emapper.annotations'
     return  path2main_table
 
 
 
-def run_hmm_mapper(path2raw, path_out):
+def run_hmm_mapper(path2raw, tmp_path):
 
     """
         Pfam annotation with hmm_mapper from eggnog-mapper scripts
@@ -76,11 +81,35 @@ def run_hmm_mapper(path2raw, path_out):
         --cut_ga --clean_overlaps clans --usemem --num_servers 1 --num_workers 4 --cpu 4 \
         --dbtype hmmdb  -d /data/soft/eggnog-mapper_2.1.9/data/pfam/Pfam-A.hmm \
         --hmm_maxhits 0 --hmm_maxseqlen 60000 \
-        --qtype seq -i %s -o %s --output_dir %s" %(path2raw, 'result_emapper', path_out)), shell = True)
+        --qtype seq -i %s -o %s --output_dir %s" %(path2raw, 'result_emapper', tmp_path)), shell = True)
 
-    path2pfam_table = path_out+'/result_emapper.emapper.hmm_hits'
+    path2pfam_table = tmp_path+'/result_emapper.emapper.hmm_hits'
 
     return path2pfam_table
+
+
+
+def annot_treeprofiler(t, path2raw, path2main_table, path2pfam_table, tmp_path ):
+
+
+    t, all_props = utils.run_clean_properties(t)
+    tmp_nw = 'tmp_tree.nw'
+    utils.run_write_post_tree(t, tmp_nw, tmp_path, all_props)
+    path2tmp_nw = tmp_path+'/tmp_tree.tree_annot.nw'
+   
+    subprocess.run(("treeprofiler annotate \
+                    -t %s  -o %s --alignment %s --emapper-pfam %s --emapper-annotations %s" %(path2tmp_nw, tmp_path , path2raw, path2pfam_table, path2main_table)), shell = True)
+
+
+    #Open again the tree:
+    path2tree_treprofiler = glob.glob(tmp_path+'/*_annotated.nw')[0]
+    
+    t = PhyloTree(open(path2tree_treprofiler), parser = 1)
+    
+
+    return t
+    
+
 
 
 

@@ -1,4 +1,5 @@
 import re
+from ete4 import PhyloTree
 
 def parse_taxid(node):
 
@@ -35,14 +36,17 @@ def get_gtdb_rank(gtdb_code):
 
 
 def get_so2use(taxonomy_db, lin_lca, args):
-    print(lin_lca)
+    
     if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+        
         if 2 in lin_lca:
             so_2_use = args.so_bact
         elif 2759 in lin_lca:
             so_2_use = args.so_euk
         elif 2157 in lin_lca:
             so_2_use = args.so_arq
+        elif 131567 in lin_lca:
+            so_2_use = args.so_cell_org
         elif 'Empty' in lin_lca:
             so_2_use = 0.0
         
@@ -128,3 +132,18 @@ def check_nodes_up(node):
         node = node.up
 
     return ogs_up, dups_up
+
+
+
+def run_write_post_tree(t, name_tree, path_out, all_props):
+
+    """
+        Write newick file after the analysis
+        TODO: return nothing????
+    """
+    name_fam = name_tree.split('.',1)[0]
+
+    post_tree = path_out+'/'+name_fam+'.tree_annot.nw'
+    t.write(outfile=post_tree, props=all_props, format_root_node = True)
+
+    return
