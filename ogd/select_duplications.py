@@ -14,17 +14,34 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
 
     # taxid_dups_og, set with the lca of the nodes that are OGs
     taxid_dups_og = set()
-    #total_mems_in_ogs = set()
+    
+
+    if args.so_euk == None:
+        so_euk = 'None'
+    else:
+        so_euk = args.so_euk
+
+    if args.so_bact == None:
+        so_bact = 'None'
+    else:
+        so_bact = args.so_bact
+    
+    if args.so_arq == None:
+        so_arq = 'None'
+    else:
+        so_arq = args.so_arq
+
+    mssg = f"""
+    3. Select high quality duplication nodes
+       -Species overlap threshold:
+            General: {args.so_all}
+            Euk: {so_euk}
+            Bact: {so_bact}
+            Arq: {so_arq}"""
+    print(mssg)
+    
 
     #Traverse tree to find the nodes that are "good" duplications and generate OGs.
-    print('\n'+'3. Select high quality duplication nodes')
-    print(' -Species overlap threshold:')
-    print('\t'+'Cell Org: '+ str(args.so_cell_org))
-    print('\t'+'Euk: '+ str(args.so_euk))
-    print('\t'+'Bact :' + str(args.so_bact))
-    print('\t'+'Arq :' + str(args.so_arq))
-
-
     for node in t.traverse("preorder"):
 
 
@@ -42,13 +59,12 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
 
                 lca_target = node.props.get('lca_node')
 
-                #Save Dups under child 1 and child2 that have the same lca_node
+                #Save Dups under child1 and child2 that have the same lca_node
                 dups_under_ch1 = list(node.children[0].search_nodes(evoltype_2='D', lca_node=lca_target))
                 dups_under_ch2 = list(node.children[1].search_nodes(evoltype_2='D', lca_node=lca_target))
 
                 save_dups_ch1 = 0 
                 save_dups_ch2 = 0 
-
 
                 # Check that dups under child1 and child2 (that have the same lca) fit all requirements : species overlap min requirement,
                 # more than 1 leaves and more than 1 species
@@ -56,7 +72,6 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
                 for n_ in  dups_under_ch1:
                     if len(n_.props.get('leaves_in')) >1 and len(n_.props.get('sp_in'))> 1 :
                         save_dups_ch1 += 1
-
 
                 for n_ in  dups_under_ch2:
                     if  len(n_.props.get('leaves_in'))>1 and len(n_.props.get('sp_in'))> 1 :
@@ -72,7 +87,6 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
             elif len(dups_under_node) == 0:
                 annotate_dups_ch(taxid_dups_og, node, 'ch1', taxonomy_db)
                 annotate_dups_ch(taxid_dups_og, node, 'ch2', taxonomy_db)
-
 
 
     # Now decide if root is OG or not
@@ -125,7 +139,6 @@ def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
             target_node.add_prop('dup_lineage', list(taxonomy_db.get_name_lineage([node.props.get('lca_node')])[0][node.props.get('lca_node')]))
         # else:
             # target_node.add_prop('dup_lineage', ['r_root'])
-
 
         target_node.add_prop('dup_node_name', node.props.get('name'))
 

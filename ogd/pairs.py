@@ -9,7 +9,13 @@ def get_all_pairs(CONTENT, total_mems_in_ogs):
     'Recovery seqs will not be included'
 
     total_pairs = set()
+    total_outliers = set()
+    strict_pairs = set()
+
     for n in CONTENT:
+
+        total_outliers.update(n.props.get('leaves_out', set()))
+
         if n.props.get('evoltype_2') == 'S':
             
             source_seqs = n.props.get('leaves_ch1')
@@ -44,16 +50,33 @@ def get_all_pairs(CONTENT, total_mems_in_ogs):
                         tupla = (l_source, l_ortho, otype, n.name)
                         total_pairs.add(tupla)
 
+
+    # remove from total_pairs, seqs that are outliers 
+
+    for p in total_pairs:
+        if len(total_outliers.intersection(p)) == 0:
+            strict_pairs.add(p)
+
+    mssg = f"""
+    4. Get Pairs
+        -Total pairs: {len(total_pairs)} """
+    print(mssg)
    
-    print('TOTAL PAIRS: ', len(total_pairs))
-    return total_pairs
+    
+    return total_pairs, strict_pairs
 
 
-def write_pairs_table(clean_pairs, path_out, name_tree):
+def write_pairs_table(clean_pairs, strict_pairs,path_out, name_tree):
 
     name_fam = name_tree.split('.',1)[0]
     pairs_results = path_out+'/'+name_fam+'.pairs.tsv'
 
     with open(pairs_results, 'w') as fout:
         for pair in clean_pairs:
+            fout.write('\t'.join(list(pair))+'\n')
+
+    strict_pairs_results = path_out+'/'+name_fam+'.stric_pairs.tsv'
+
+    with open(strict_pairs_results, 'w') as fout:
+        for pair in strict_pairs:
             fout.write('\t'.join(list(pair))+'\n')

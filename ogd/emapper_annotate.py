@@ -13,12 +13,12 @@ EMAPPER ANNOTATION
 
 
 def annotate_with_emapper(t, alg, tmp_path):
+    
     """"
         Add to the leaves of tree t the information coming from emapper
         and return the annotated tree.
     """
-    # In the main program, we are actually only interested in annotations
-    # the pfam domains, but we have to take it all from emapper.
+   
     path2raw = alg2rawfasta(alg, tmp_path)
 
     path2main_table = run_emapper(path2raw, tmp_path)
@@ -30,14 +30,13 @@ def annotate_with_emapper(t, alg, tmp_path):
 
     # t = annot_tree_main_table(t, path2main_table)
 
-    # TODO: Check if we really do not need this (because it
-    # is done in the main function already?):
-    #   t, all_props = run_clean_properties(t)
-    #   run_write_post_tree(t, name_tree, path_out, all_props)
-
     return t
 
 def alg2rawfasta(alg, tmp_path):
+    
+    """
+    Remove gaps '-' from alignment to get raw fasta 
+    """
 
     fasta = SeqGroup(alg)
     path2raw = tmp_path+'/total_raw_fasta.faa'
@@ -100,13 +99,11 @@ def annot_treeprofiler(t, path2raw, path2main_table, path2pfam_table, tmp_path )
     subprocess.run(("treeprofiler annotate \
                     -t %s  -o %s --alignment %s --emapper-pfam %s --emapper-annotations %s" %(path2tmp_nw, tmp_path , path2raw, path2pfam_table, path2main_table)), shell = True)
 
-
     #Open again the tree:
     path2tree_treprofiler = glob.glob(tmp_path+'/*_annotated.nw')[0]
     
     t = PhyloTree(open(path2tree_treprofiler), parser = 1)
     
-
     return t
     
 
@@ -116,6 +113,7 @@ def annot_treeprofiler(t, path2raw, path2main_table, path2pfam_table, tmp_path )
 def annot_tree_pfam_table(post_tree, pfam_table, alg_fasta):
 
     """
+        Deprecated
         Annotate tree with pfam table from eggnog-mapper
     """
 
@@ -171,6 +169,7 @@ def annot_tree_pfam_table(post_tree, pfam_table, alg_fasta):
 def annot_tree_main_table(post_tree, main_table):
 
     """
+        Deprecated
         Annotate tree with main table from eggnog-mapper
     """
 

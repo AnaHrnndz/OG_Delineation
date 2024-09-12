@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-# 5. Get OGs for all taxonomical levels
+#  Get OGs for all taxonomical levels
 def get_ogs(t, level2sp_mem, taxonomy_db):
 
     my_descendant = get_my_descendant(level2sp_mem, taxonomy_db)
@@ -45,41 +45,12 @@ def get_ogs(t, level2sp_mem, taxonomy_db):
             ogs[str(lca_subtree)][name] = (subtree.name, '|'.join(list(all_leaves_subtree)))
 
 
-        # for taxa in lin2check:
-
-            # if str(taxa) in level2sp_mem.keys():
-                # if len(list(subtree.search_nodes(lca_node=str(taxa), node_create_og='True'))) == 0:
-                    # name = 'OG_'+str(count)
-                    # count+=1
-                    # mems = get_members(subtree, taxa)
-                    # if len(mems.split('|')) >=1:
-                        # ogs[str(taxa)][name] = (subtree.name, (mems))
-
-
-
         '''
             Si dentro del OG,x ejemplo niv euk hay og niv eumetazoa,
             pero hay sp eumetazoa fuera de los og-eumetazoa
             hay que recuperarlas en un messy_og-eumetazoa
         '''
-        # for taxa in taxa2remove:
-            # subtree_taxa_leaves = set(get_members(subtree, taxa).split('|'))
-
-            # leaves2remove = set()
-            # dups_in_subtree = subtree.search_nodes(lca_node=str(taxa), node_create_og='True')
-            # for n_ in dups_in_subtree:
-                # mems = get_members(subtree, taxa)
-                # leaves2remove.update(set(mems.split('|')))
-
-
-            # if len(subtree_taxa_leaves.difference(leaves2remove))>=1:
-                # name = 'OG_'+str(count)
-                # count+=1
-                # ogs[str(taxa)][name] = (subtree.name, '|'.join(subtree_taxa_leaves.difference(leaves2remove)))
-
-
-
-
+        
 
     base_ogs = from_lca_tree2cellorg(t, ogs, taxonomy_db, count)
 

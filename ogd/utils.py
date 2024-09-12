@@ -35,24 +35,82 @@ def get_gtdb_rank(gtdb_code):
     return rank
 
 
-def get_so2use(taxonomy_db, lin_lca, args):
+def get_so2use(taxonomy_db, lin_lca, lca_node,args):
     
     if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
         
-        if 2 in lin_lca:
-            so_2_use = args.so_bact
-        elif 2759 in lin_lca:
-            so_2_use = args.so_euk
-        elif 2157 in lin_lca:
-            so_2_use = args.so_arq
-        elif 131567 in lin_lca:
-            so_2_use = args.so_cell_org
-        elif 'Empty' in lin_lca:
-            so_2_use = 0.0
+        if args.so_euk != None:
+            if 2759 in lin_lca:
+                so_2_use = args.so_euk
+            else:
+                so_2_use = args.so_all
+
+        elif args.so_bact != None:
+            if 2 in lin_lca:
+                so_2_use = args.so_bact
+            else:
+                so_2_use = args.so_all
+
+        elif args.so_arq != None:
+            if 2157 in lin_lca:
+                so_2_use = args.so_arq
+            else:
+                so_2_use = args.so_all
+
+        else:
+            so_2_use = args.so_all
+
+        # elif args.so_specf == None and  args.so_lin == None:
+            # so_2_use = args.so_all
+
+        # elif args.so_lin != None and args.so_specf == None:
+            # lev = int(args.so_lin[0])
+            # so = args.so_lin[1]
+            # if lev in lin_lca:
+                # so_2_use = so
+            # else:
+                # so_2_use = args.so_all
+
+        # elif args.so_specf != None and args.so_lin == None:
+            # lev = int(args.so_specf[0])
+            # so = args.so_specf[1]
+            # if lev == lca_node :
+                # so_2_use = so
+            # else:
+                # so_2_use = args.so_all
+
+        # elif args.so_specf != None and args.so_lin != None:
+            # lev_only = int(args.so_specf[0])
+            # lev_from = int(args.so_lin[0])
+           
+            # if lev_only == lca_node :
+                # so = args.so_specf[1]
+                # so_2_use = so
+            # elif lev_from in lin_lca:
+                # so = args.so_lin[1]
+                # so_2_use = so
+            # else:
+                # so_2_use = args.so_all
+
+        
+        
+        #if  in lin_lca:
+        #    so_2_use = args.so_bact
+        #elif 2759 in lin_lca:
+        #    so_2_use = args.so_euk
+        #elif 2157 in lin_lca:
+        #    so_2_use = args.so_arq
+        #elif 131567 in lin_lca:
+        #    so_2_use = args.so_cell_org
+        #elif 'Empty' in lin_lca:
+        #    so_2_use = 0.0
+        #
+        #else:
+        #    so_2_use = args.so_all
         
 
     elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-        
+
         if 'd__Bacteria' in lin_lca:
             so_2_use = args.so_bact
         elif 'd__Archaea' in lin_lca:
@@ -61,10 +119,12 @@ def get_so2use(taxonomy_db, lin_lca, args):
             so_2_use = args.so_cell_org
         elif 'Empty' in lin_lca:
             so_2_use = 0.0
+        else:
+            so_2_use = args.so_all
 
-    else:
-        so_2_use = 0.1
 
+
+    
     return so_2_use
 
 

@@ -75,7 +75,6 @@ def run_write_fastas(t, fasta, name_tree, path_out, ogs_info, total_mems_in_ogs,
         Function calls  write_outog_seqs() AND write_og_seqs_regular_mode() OR write_og_seqs_fast_mode()
     """
 
-    print('-Fastas')
 
     fasta = SeqGroup(fasta)
 

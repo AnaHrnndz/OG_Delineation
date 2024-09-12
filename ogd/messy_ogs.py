@@ -55,36 +55,6 @@ def get_messy_groups(t, taxonomy_db):
 
 
 
-            # elif n.props.get('node_is_og') == 'True':
-
-                # node_lin = n.props.get('lineage')
-
-                # # Get all lineages in OG
-                # lin2mems = defaultdict(set)
-
-                # all_mems = n.props.get('_leaves_in', set())
-
-                # for mem in all_mems:
-
-                    # for lin in n[mem].props.get('lineage').split('|'):
-
-                        # if int(lin) not in node_lin:
-                            # lin2mems[int(lin)].add(mem)
-
-
-                # for lin, mems in lin2mems.items():
-
-                    # nodes2check = set(ch.search_nodes(node_create_og='True',lca_node=lin))
-                    # mems2remove = set()
-                    # for n_ in nodes2check:
-                        # mems2remove.update(n_.props.get('_leaves_in'))
-
-                    # diff = mems.difference(mems2remove)
-                    # if  len(diff)>1:
-                        # c, messy_ogs, seqs_in_messy_ogs = new_mog(c, messy_ogs, n, taxonomy_db, seqs_in_messy_ogs, lin, diff)
-
-
-
     messy_ogs = add_mogs_up_down(messy_ogs, t)
 
     return t,  messy_ogs, seqs_in_messy_ogs
