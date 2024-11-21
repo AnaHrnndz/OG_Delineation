@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 
-from ete4 import  PhyloTree, SeqGroup, Tree
+from ete4 import  PhyloTree, Tree
 from ete4 import NCBITaxa, GTDBTaxa
-from collections import Counter, OrderedDict, defaultdict
+from collections import defaultdict
 import sys
 import os
 import json
 import argparse
 import warnings
 import re
-import glob
-import subprocess
 import csv
 import pathlib
 
@@ -23,9 +21,11 @@ import utils
 from tree_setup  import run_setup
 from outliers_scores import run_outliers_and_scores
 from select_duplications import  run_get_main_dups
-from orthologs_groups import get_ogs
+from orthologs_groups import get_all_ogs
 from timer import Timer
-from messy_ogs import get_messy_groups, annotate_messy_og
+import prepare_outputs
+
+#from messy_ogs import get_messy_groups, annotate_messy_og
 
 cwd =  str(pathlib.Path(__file__).parent.resolve())
 
@@ -39,9 +39,13 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 ## 1. Load initial info   ##
 
 def create_tmp(path_out):
+
+    """
+        Create the tmp dir 
+    """
     path = os.path.join(path_out, 'tmp_dir') 
   
-# Create the directory 
+ 
     try: 
         os.makedirs(path, exist_ok = True) 
         
@@ -49,6 +53,7 @@ def create_tmp(path_out):
         print("Directory '%s' can not be created" % path)
 
     return path 
+
 
 def load_tree_local(tree=None, taxonomy = None, sp_delimitator = None):
 
@@ -101,14 +106,12 @@ def load_reftree(rtree=None, t=None, taxonomy_db=None):
     """
         Get reference tree (species tree) from input tree or user provide it
     """
-
-    
     
     if rtree != None:
         mssg3 = f"""        -Load reftree: from user"""
         print(mssg3)
         
-        reftree = PhyloTree(open(rtree))
+        reftree = PhyloTree(open(rtree), parser = 0)
     else:
         mssg3 = f"""        -Load reftree: from gene tree"""
         print(mssg3)
@@ -181,123 +184,18 @@ def get_taxonomy_counter(reftree, taxonomy = None):
     return level2sp_mem
 
 
-
-##  6. Add info about Core-OGs up and down  ##
-
-def add_nodes_up_down(t):
-
-    """
-        Traverse the tree, for each node,  detect ogs that are up or below
-    """
-
-    for node in t.traverse('preorder'):
-        if node.props.get('node_is_og'):
-            node_name = node.name
-
-            #Detect OGs below node
-            ogs_down = set()
-            dups_down = list()
-            for n in node.search_nodes(node_is_og="True"):
-                if node_name != n.name:
-                    ogs_down.add(n.name)
-                    dups_down.append(n.up.name)
-
-            if len(ogs_down) > 0:
-                node.add_prop('ogs_down',ogs_down)
-                node.add_prop('dups_down', dups_down)
-            else:
-                node.add_prop('ogs_down','-')
-                node.add_prop('dups_down', '-')
-
-            #Detect OGs up
-            ogs_up = set()
-            dups_up = list()
-            ogs_up, dups_up = utils.check_nodes_up(node)
-
-            if len(ogs_up) > 0:
-                node.add_prop('ogs_up', ogs_up)
-                node.add_prop('dups_up', dups_up)
-            else:
-                node.add_prop('ogs_up', '-')
-                node.add_prop('dups_up', '-')
-
-    ogs_down = set()
-    dups_down = list()
-    for n in t.search_nodes(node_is_og="True"):
-        if n.name != t.name:
-            ogs_down.add(n.name)
-            dups_down.append(n.up.name)
-
-    if len(ogs_down) > 0:
-        t.add_prop('ogs_down',ogs_down)
-        t.add_prop('dups_down', dups_down)
-    else:
-        t.add_prop('ogs_down','-')
-        t.add_prop('dups_down', '-')
-
-
-    return t
-
-
-# 7. Annotate base-OGs
-def annot_ogs(t, base_ogs, taxonomy_db):
-
-    ##OG_name   TaxoLevel   AssocNode  lensp_in_OG OG_up   OG_down num_OG_mems    members
-
-    annot_base_ogs = defaultdict(dict)
-    total_mems_in_ogs = set()
-    for taxa, ogs in base_ogs.items():
-        for og_name, og_info in ogs.items():
-            
-            if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-                sci_name_taxa =  taxonomy_db.get_taxid_translator([taxa])[int(taxa)]
-        
-            elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-                sci_name_taxa = taxa
-            
-            ogs_down = '|'.join(list((t[og_info[0]].props.get('ogs_down','-'))))
-            ogs_up = '|'.join(list((t[og_info[0]].props.get('ogs_up', '-'))))
-            recover_seqs = list(t[og_info[0]].props.get('recovery_seqs', list()))
-
-            mems = og_info[1].split('|')
-            sp_in_og = set()
-            for l in mems:
-                sp_in_og.add(l.split('.')[0])
-
-            if not recover_seqs:
-                len_recover_seqs = '0'
-                recover_seqs.append('-')
-            else:
-                len_recover_seqs = str(len(recover_seqs))
-
-
-            annot_base_ogs[og_name]['TaxoLevel'] = taxa
-            annot_base_ogs[og_name]['SciName_TaxoLevel'] = sci_name_taxa.replace(' ', '_')
-            annot_base_ogs[og_name]['AssocNode'] = og_info[0]
-            annot_base_ogs[og_name]['NumSP'] = len(sp_in_og)
-            annot_base_ogs[og_name]['OG_down'] = ogs_down
-            annot_base_ogs[og_name]['OG_up'] = ogs_up
-            annot_base_ogs[og_name]['NumMems'] = len(mems)
-            annot_base_ogs[og_name]['Mems'] = '|'.join(mems)
-            annot_base_ogs[og_name]['RecoverySeqs'] = '|'.join(recover_seqs)
-            annot_base_ogs[og_name]['NumRecoverySeqs'] = len_recover_seqs
-
-            total_mems_in_ogs.update(set(mems))
-
-    return annot_base_ogs, total_mems_in_ogs
-
-
 ##  8.Annotate root ##
-def annotate_root(base_ogs_annot, t, name_tree, total_mems_in_tree, sp_set, total_mems_in_ogs, recovery_seqs, taxonomy_db, args):
+def annotate_root(ogs_info, t, name_tree, total_mems_in_tree, sp_set, seqs_in_ogs, recover_seqs, taxonomy_db, args):
 
     """
     Add properties in root
     Add info about the root in ogs_info dict
+    Need for web
     """
 
     # Save parameters as property
 
-    parametrs2save = ["outliers_node@"+str(args.outliers_node), "outliers_reftree@"+str(args.outliers_reftree), 
+    parametrs2save = ["lineage_thr@"+str(args.lineage_thr), "best_tax_thr@"+str(args.best_tax_thr), 
                     "sp_loss_perc@"+str(args.sp_loss_perc), "inherit_out@"+str(args.inherit_out), "sp_ovlap_all@"+str(args.so_all)]
     
     if args.so_bact != None:
@@ -313,11 +211,11 @@ def annotate_root(base_ogs_annot, t, name_tree, total_mems_in_tree, sp_set, tota
 
     # Save general results as properties, needed for web
 
-    seqs_out_ogs = total_mems_in_tree.difference(total_mems_in_ogs)
+    seqs_out_ogs = total_mems_in_tree.difference(seqs_in_ogs)
     
     results2save = ["Tree_name@"+name_tree, "Total_seqs@"+str(len(total_mems_in_tree)), "Total_species@"+str(len(sp_set)),
-                    "Seqs_in_OGs@"+str(len(total_mems_in_ogs)), "Recovery_seqs@"+str(len(recovery_seqs)), "Seqs_out_OGs@"+str(len(seqs_out_ogs)), 
-                    "Num_OGs@"+str(len(base_ogs_annot))]
+                    "Seqs_in_OGs@"+str(len(seqs_in_ogs)), "Recovery_seqs@"+str(len(recover_seqs)), "Seqs_out_OGs@"+str(len(seqs_out_ogs)), 
+                    "Num_OGs@"+str(len(ogs_info))]
     
     general_results_str = '|'.join(results2save)
     t.add_prop('general_result', general_results_str)
@@ -339,8 +237,8 @@ def annotate_root(base_ogs_annot, t, name_tree, total_mems_in_tree, sp_set, tota
     taxlev_list = []
     for taxlev, og in taxlev2ogs.items():
         
-        if isinstance(taxlev, str):
-            taxlev = int(taxlev)
+        #if isinstance(taxlev, str):
+        taxlev = int(taxlev)
 
         if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
             sci_name = taxonomy_db.get_taxid_translator([taxlev])[taxlev]
@@ -363,13 +261,13 @@ def annotate_root(base_ogs_annot, t, name_tree, total_mems_in_tree, sp_set, tota
 
 
 ##  9. Flag seqs out OGs ##
-def flag_seqs_out_og(t, total_mems_in_ogs, total_mems_in_tree):
+def flag_seqs_out_og(t, seqs_in_ogs, total_mems_in_tree):
 
     """
         Flags seqs that do no belong to any OG
-        Could be for taxonomical outlier or for branch lenght
+        Could be for taxonomic outlier or for branch lenght
     """
-    seqs_out_og = total_mems_in_tree.difference(total_mems_in_ogs)
+    seqs_out_og = total_mems_in_tree.difference(seqs_in_ogs)
     for leaf in t:
         if leaf.name in seqs_out_og:
             leaf.add_prop('seq_out_og', "true")
@@ -377,87 +275,6 @@ def flag_seqs_out_og(t, total_mems_in_ogs, total_mems_in_tree):
     t, props = utils.run_clean_properties(t)
 
     return t
-
-
-
-#####   FUNCIONTS TO PREPARE OUTPUTS FILES (newick, etc)    ####
-
-
-def get_seq2og_v2(base_ogs_annot, messy_ogs):
-
-    seq2ogs = defaultdict(set)
-    for og, info in base_ogs_annot.items():
-        for s in info['Mems'].split('|'):
-            seq2ogs[s].add(og+'@'+info['TaxoLevel'])
-        for s in info['RecoverySeqs'].split('|'):
-            if s != '-':
-                seq2ogs[s].add(og+'@'+info['TaxoLevel'])
-
-    for mog, info in messy_ogs.items():
-        for s in info['Mems']:
-            seq2ogs[s].add(mog+'@'+info['TaxoLevel'])
-        for s in info['RecoverySeqs']:
-            if s != '-':
-                seq2ogs[s].add(og+'@'+info['TaxoLevel'])
-
-    return seq2ogs
-
-
-def write_seq2ogs(seq2ogs, path, name_tree):
-
-    """
-        Write a table with seq2ogs info
-    """
-
-    name_fam = name_tree.split('.')[0]
-    seq2ogs_out = open(path+'/'+name_fam+'.seq2ogs.tsv', 'w')
-    for seq, ogs in seq2ogs.items():
-        seq2ogs_out.write(seq+'\t'+'|'.join(list(ogs))+'\n')
-
-    seq2ogs_out.close()
-
-
-def write_ogs_info(base_ogs_annot, messy_ogs, name_tree, path):
-
-    name_fam = name_tree.split('.',1)[0]
-    name_out =  path+'/'+name_fam+'.ogs_info.tsv'
-
-
-    with open(name_out, "w",  newline='') as myfile:
-        w = csv.writer(myfile, delimiter='\t')
-        w.writerow(('#OG_name', 'TaxoLevel', 'SciName_TaxoLevel', 'AssocNode',  'NumSP', 'OG_down', 'OG_up', 'NumSeqs', 'NumRecoverySeqs','Seqs', 'RecoverySeqs'))
-
-        for og_name in base_ogs_annot.keys():
-
-            w.writerow((
-                og_name,    #1
-                base_ogs_annot[og_name]['TaxoLevel'], #2
-                base_ogs_annot[og_name]['SciName_TaxoLevel'], #3
-                base_ogs_annot[og_name]['AssocNode'],   #4
-                base_ogs_annot[og_name]['NumSP'],   #5
-                base_ogs_annot[og_name]['OG_down'], #6
-                base_ogs_annot[og_name]['OG_up'] ,  #7
-                base_ogs_annot[og_name]['NumMems'], #8
-                base_ogs_annot[og_name]['NumRecoverySeqs'], #9
-                base_ogs_annot[og_name]['Mems'], #10
-                base_ogs_annot[og_name]['RecoverySeqs'] #11
-            ))
-
-        for mog_name in messy_ogs.keys():
-            w.writerow((
-                mog_name, #1
-                messy_ogs[mog_name]['TaxoLevel'],  #2
-                messy_ogs[mog_name]['SciName_TaxoLevel'],  #3
-                messy_ogs[mog_name]['AssocNode'], #4
-                messy_ogs[mog_name]['NumSP'],  #5
-                '|'.join(list(messy_ogs[mog_name]['OG_down'])), #6
-                '|'.join(list(messy_ogs[mog_name]['OG_up'])), #7
-                messy_ogs[mog_name]['NumMems'], #8
-                str(messy_ogs[mog_name]['NumRecoverySeqs']) , #9
-                '|'.join(list(messy_ogs[mog_name]['Mems'])), #10
-                '|'.join((messy_ogs[mog_name]['RecoverySeqs']))#11
-            ))
-
 
 
 
@@ -479,27 +296,22 @@ def run_app(tree, abs_path, name_tree, path_out, args):
         3. Outliers and Dups score:
             Detect long branches, taxonomical outliers, calculate species overlap, score1, score2 and inpalalogs_rate
         4. Detect HQ-Duplications:
-            Select high quality duplication that create Basal Orthologs Groups (OGs)
-        5. Get OGs for all taxonomical levels
-        6. Add info about Basal-OGs up and down:
-            For each Basal-OG detect upper and below Basal-OGs (Basal-OGs have nested structure)
-        7. Annotate Basal-OGs with taxonomy, etc
-        8. Get messy OGs
-        9. Optionally modify Basal-OGs by recovering sequences (see RECOVERY PIPELINE)
-        10. Optionally add annotations from emapper  (see EMAPPER ANNOTATION)
-            10.1 Run emapper and annotate with treeprofiler
-            10.2 Only annotate with treeprofiler
-        11. Optionally skip get all orthologs pairs
-        12. Annotate root & messy_ogs
-        13. Flag seqs out OGs
-        14. Write output files
+            Select high quality duplication that create Monophyletic Orthologs Groups (OGs)
+        5. Get Monophyletic and Paraphyletic OGs
+        6. Optionally skip get all orthologs pairs
+        7. Optionally modify Monophyletic-OGs by recovering sequences (see RECOVERY PIPELINE)
+        8. Optionally add annotations from emapper  (see EMAPPER ANNOTATION)
+            8.1 Run emapper and annotate with treeprofiler
+            8.2 Only annotate with treeprofiler
+        9. Annotate root & messy_ogs
+        10. Flag seqs out OGs
+        11. Write output files
     """
 
     # 1. Load files and DBs
     mssg = f"""
     0. Load info"""
     print(mssg)
-
 
     t = load_tree_local(tree = tree, taxonomy = args.taxonomy_type, sp_delimitator = args.sp_delim)
     taxonomy_db = load_taxonomy(taxonomy = args.taxonomy_type, user_taxonomy= args.user_taxonomy)
@@ -508,81 +320,74 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     tmp_path = create_tmp(path_out)
     
 
-
     # 2. Tree setup (Pre-analysis):  resolve polytomies, rooting, ncbi annotation, etc
     t_nw , sp_set, total_mems_in_tree, num_total_sp, user_props = run_setup(t, name_tree, taxonomy_db, args.rooting, path_out, abs_path, args.sp_delim)
+    
 
     # 3. Outliers and Dups score functions
     t, CONTENT = run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
+ 
 
     # 4. Detect HQ-Duplications
     t,  taxid_dups_og  = run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args)
 
-    # 5. Get Basal-OGs for all taxonomical levels
-    base_ogs = get_ogs(t, level2sp_mem,taxonomy_db)
 
-    # 6. Add info about OGs up and down
-    t = add_nodes_up_down(t)
+    # 5. Get Monophyletic and Paraphyletic OGs
+    t, ogs_info, seqs_in_ogs = get_all_ogs(t, taxonomy_db)
 
-    # 7. Annotate Basal-OGs
-    base_ogs_annot, total_mems_in_ogs = annot_ogs(t, base_ogs, taxonomy_db)
 
-    # 8. Get messy OGs
-    t, messy_ogs, seqs_in_messy_ogs = get_messy_groups(t, taxonomy_db)
-    total_mems_in_ogs.update(seqs_in_messy_ogs)
+    # 6. Optionally skip get all orthologs pairs
+    if not args.skip_get_pairs:
+        clean_pairs, strict_pairs = pairs.get_all_pairs(CONTENT)
+        pairs.write_pairs_table(clean_pairs, strict_pairs, path_out, name_tree)
 
-    # 9. Optionally modify Basal-OGs by recovering sequences
-    recovery_seqs = set()
-    best_match = defaultdict()
+
+    # 7. Optionally modify Basal-OGs by recovering sequences
+    recover_seqs = set()
+    seqs2recover = (total_mems_in_tree.difference(seqs_in_ogs))
     if args.run_recovery:
-        if args.alg and len(total_mems_in_tree.difference(total_mems_in_ogs)) > 0 and len(total_mems_in_ogs) > 0:
-            recovery_seqs, best_match = recover_sequences(tree, t, args.alg, total_mems_in_tree, total_mems_in_ogs, name_tree, path_out, base_ogs_annot, args.mode)
-            base_ogs_annot, total_mems_in_ogs = annot_ogs(t, base_ogs, taxonomy_db)
+        if args.alg and len(seqs2recover)>0 and len(seqs_in_ogs) > 0:
+            recover_seqs, ogs_info = recover_sequences(t, args.alg, ogs_info, seqs2recover, name_tree, path_out, args.run_recovery)
+            seqs_in_ogs.update(recover_seqs)
+            
 
-    else:
-        recovery_seqs = set()
-        best_match = defaultdict()
-
-    # 10. Optionally add annotations from emapper
-        # 10.1 Run emapper and annotate with treeprofiler
+    # 8. Optionally add annotations from emapper
+        # 8.1 Run emapper and annotate with treeprofiler
     if args.run_emapper:
         t = annotate_with_emapper(t, args.alg, tmp_path)
         
-        # 10.2 Only annotate with treeprofiler
+        # 8.2 Only annotate with treeprofiler
     if args.path2emapper_main:
         main_table = args.path2emapper_main
         pfam_table = args.path2emapper_pfams
         t = annot_treeprofiler(t, args.alg, main_table, pfam_table, tmp_path) 
+    
 
-    # 11. Optionally skip get all orthologs pairs
-    if not args.skip_get_pairs:
-        clean_pairs, strict_pairs = pairs.get_all_pairs(CONTENT, total_mems_in_ogs)
-        pairs.write_pairs_table(clean_pairs, strict_pairs, path_out, name_tree)
-        
+    # 9. Annotate root 
+    annotate_root(ogs_info, t, name_tree, total_mems_in_tree, sp_set, seqs_in_ogs, recover_seqs, taxonomy_db, args)
 
-    # 12. Annotate root & messy_ogs
-    annotate_root(base_ogs_annot, t, name_tree, total_mems_in_tree, sp_set, total_mems_in_ogs, recovery_seqs, taxonomy_db, args)
-    messy_ogs_annot = annotate_messy_og(t, messy_ogs)
+    
+    # 10. Flag seqs out OGs
+    t = flag_seqs_out_og(t, seqs_in_ogs, total_mems_in_tree)
 
-    # 13. Flag seqs out OGs
-    total_mems_in_ogs.update(recovery_seqs)
-    t = flag_seqs_out_og(t, total_mems_in_ogs, total_mems_in_tree)
-
-    # 14. Write output files
-
+    # 11. Write output files
     mssg4 = f"""
     5. Writing output files
     """
     print(mssg4)
 
-    write_ogs_info(base_ogs_annot, messy_ogs_annot, name_tree, path_out)
+    prepare_outputs.write_ogs_info(ogs_info, name_tree, path_out)
 
-    seq2ogs = get_seq2og_v2(base_ogs_annot, messy_ogs_annot)
-    write_seq2ogs(seq2ogs, path_out,  name_tree)
+    seq2ogs = prepare_outputs.get_seq2og(ogs_info)
+    prepare_outputs.write_seq2ogs(seq2ogs, path_out,  name_tree)
 
     t, all_props = utils.run_clean_properties(t)
 
     utils.run_write_post_tree(t, name_tree, path_out, all_props)
+
+
+
+
 
 
 def get_args():
@@ -591,18 +396,14 @@ def get_args():
     parser.add_argument('--tree', dest = 'tree', required = True)
     parser.add_argument('--raw_alg', dest = 'alg')
     parser.add_argument('--output_path', dest = 'out_path', required= True)
-    parser.add_argument('--mode', dest='mode', choices= ["fast", "regular"], default = "regular", type = str)
-
-    parser.add_argument('--sp_ovlap_all', default = 0.01, dest = 'so_all', type = float)
-    # parser.add_argument('--sp_ovlap_lin', dest = 'so_lin', nargs = 2, type = float)
-    # parser.add_argument('--sp_ovlap_specf', dest = 'so_specf', nargs = 2, type = float)
     
+    parser.add_argument('--sp_ovlap_all', default = 0.01, dest = 'so_all', type = float)
     parser.add_argument('--sp_ovlap_euk', dest = 'so_euk', type = float)
     parser.add_argument('--sp_ovlap_bact', dest = 'so_bact' ,  type = float)
     parser.add_argument('--sp_ovlap_arq', dest = 'so_arq', type = float)
 
-    parser.add_argument('--outliers_in_node', dest = 'outliers_node' , default = 0.05, type = float)
-    parser.add_argument('--outliers_in_reftree', dest = 'outliers_reftree' , default = 0.05, type = float)
+    parser.add_argument('--lineage_threshold', dest = 'lineage_thr' , default = 0.05, type = float)
+    parser.add_argument('--best_taxa_threshold', dest = 'best_tax_thr' , default = 0.9, type = float)
     parser.add_argument('--inherit_outliers', dest = 'inherit_out', choices = ['Yes', 'No'], default = 'Yes', type = str)
     parser.add_argument('--species_losses_perct', dest = 'sp_loss_perc' , default = 0.3, type = float)
     parser.add_argument('--rooting', choices = ['Midpoint', 'MinVar', ''])
@@ -613,7 +414,7 @@ def get_args():
     parser.add_argument('--run_emapper', action='store_true')
     parser.add_argument('--run_treeprofiler_emapper_annotation', dest='path2emapper_main')
     parser.add_argument('--run_treeprofiler_emapper_pfams', dest='path2emapper_pfams')
-    parser.add_argument('--run_recovery', action='store_true')
+    parser.add_argument('--run_recovery', dest = 'run_recovery',  choices= ["run-align", "skip-align"])
     parser.add_argument('--skip_get_pairs', action='store_true')
     parser.add_argument('--sp_delimitator', dest = 'sp_delim', default='-')
 

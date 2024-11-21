@@ -4,7 +4,7 @@ from collections import defaultdict
 ####    GET ALL ORTHOLOGS PAIRS ####
 
 
-def get_all_pairs(CONTENT, total_mems_in_ogs):
+def get_all_pairs(CONTENT):
 
     'Recovery seqs will not be included'
 
@@ -51,7 +51,7 @@ def get_all_pairs(CONTENT, total_mems_in_ogs):
                         total_pairs.add(tupla)
 
 
-    # remove from total_pairs, seqs that are outliers 
+    # remove from total_pairs, seqs that are outliers
 
     for p in total_pairs:
         if len(total_outliers.intersection(p)) == 0:

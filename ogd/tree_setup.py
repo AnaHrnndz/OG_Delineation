@@ -23,7 +23,7 @@ def run_setup(t, name_tree, taxonomy_db, rooting, path_out, abs_path, sp_delimit
 
     t = check_branch_legth(t)
 
-    t = run_rooting(t, rooting, taxonomy_db, path_out, abs_path, sp_delimitator)
+    t = run_rooting(t, rooting, path_out, abs_path, sp_delimitator)
 
     t = add_taxomical_annotation(t, taxonomy_db)
 
@@ -35,10 +35,8 @@ def run_setup(t, name_tree, taxonomy_db, rooting, path_out, abs_path, sp_delimit
         if not n.is_leaf:   
             n.name = '%s-%d' % (make_name(i), get_depth(n))
 
-
     set_sp_total = t.get_species()
     num_total_sp = len(set_sp_total)
-
 
     mssg = f"""
     1. Pre-analysis
@@ -48,7 +46,7 @@ def run_setup(t, name_tree, taxonomy_db, rooting, path_out, abs_path, sp_delimit
     print(mssg)
     
 
-    # Newick format needed for web
+    # Newick format need for web
     t, props = utils.run_clean_properties(t)
     tree_nw = utils.get_newick(t, props)
 
@@ -65,16 +63,19 @@ def check_branch_legth(t):
     for n in t.traverse():
         if n.dist != None:
             lenghts.append(n.dist)
+        
 
     if (all(v == 0.0 for v in lenghts)) == True:
         for n in t.traverse():
             if n.dist != None:
                 n.dist = 1.0
+            else:
+                print(len(n))
 
     return t
 
 
-def run_rooting(t, rooting,  taxonomy_db, path_out, abs_path, sp_delimitator):
+def run_rooting(t, rooting, path_out, abs_path, sp_delimitator):
 
     """
         Tree rooting.
@@ -89,23 +90,30 @@ def run_rooting(t, rooting,  taxonomy_db, path_out, abs_path, sp_delimitator):
             print('Error in Midpoint')
 
     elif rooting == "MinVar":
-        t = run_minvar(t, taxonomy_db, path_out, abs_path, sp_delimitator)
+        t = run_minvar(t, path_out, abs_path, sp_delimitator)
 
     else:
         print('No rooting')
 
     return t
 
-def run_minvar(t, taxonomy_db, path_out, abs_path, sp_delimitator):
+
+def run_minvar(t, path_out, abs_path, sp_delimitator):
 
     """
-        With MinVar rooting, you need to write the rooted tree and 
-        then open it again with PhyloTree
+        With MinVar rooting, you need to :
+        1. Write the tree, polytomies had been resolved in previous step
+        2. Run MinVar
+        3. Open it again with PhyloTree
+    
     """
-    path2tree = abs_path
-    path2tmptree = path_out+'tmp_dir/'+'minvar_tree.nw'
-    stdout_file = open(path_out+'tmp_dir/'+'minvar.stdout', 'w')
-    stderr_file = open(path_out+'tmp_dir/'+'minvar.stderr', 'w')
+    tmp_path = path_out+'tmp_dir/'
+    
+    input_tree_minvar = utils.write_tree_for_minvar_rootin(t, tmp_path)
+    path2tree = input_tree_minvar
+    path2tmptree = path_out+'tmp_dir/'+'output_minvar_tree.nw'
+    stdout_file = open(tmp_path+'minvar.stdout', 'w')
+    stderr_file = open(tmp_path+'minvar.stderr', 'w')
 
     subprocess.run(("FastRoot.py -i %s -o %s" \
         %(path2tree, path2tmptree)), shell = True, stdout = stdout_file, stderr= stderr_file)
@@ -132,6 +140,7 @@ def add_taxomical_annotation(t, taxonomy_db):
         
     return t
 
+
 def make_name(i):
 
     """
@@ -143,6 +152,7 @@ def make_name(i):
         name = chars[i % len(chars)] + name
         i = i // len(chars) - 1
     return name
+
 
 def get_depth(node):
 

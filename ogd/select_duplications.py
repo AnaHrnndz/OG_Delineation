@@ -41,9 +41,11 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
     print(mssg)
     
 
-    #Traverse tree to find the nodes that are "good" duplications and generate OGs.
+    # Traverse tree to find the nodes that are "good" duplications and generate OGs.
     for node in t.traverse("preorder"):
 
+        #if node.is_root:
+        #    pass
 
         if not node.is_leaf and node.props.get('evoltype_2') == 'D'  \
         and len(node.props.get('leaves_in')) >1 and len(node.props.get('sp_in')) > 1 :
@@ -89,19 +91,24 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
                 annotate_dups_ch(taxid_dups_og, node, 'ch2', taxonomy_db)
 
 
-    # Now decide if root is OG or not
+    #  Now decide if root is OG or not,
+    #  if there are not dups at the same level that root's lca
+    #  then root is a monophyletic_og 
     if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
         lca_root = int(t.props.get('lca_node'))
     elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
         lca_root = (t.props.get('lca_node'))
 
+    #if len(list(t.search_nodes(evoltype_2='D', lca_node=lca_root))) == 0:
+    if len(list(t.search_nodes(monophyletic_og='True', lca_node=lca_root))) == 0:
+        t.add_prop('monophyletic_og', 'True')
+
     
-    if len(list(t.search_nodes(evoltype_2='D', lca_node=lca_root))) == 0:
-        t.add_prop('node_is_og', 'True')
-        
     t, props = utils.run_clean_properties(t)
 
     return t, taxid_dups_og
+
+
 
 
 def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
@@ -127,7 +134,7 @@ def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
         target_node = next(node.search_nodes(name=og_name_ch))
 
     if  len(sp_ch) > 1 and len(og_ch_mems) > 1:
-        target_node.add_prop('node_is_og', 'True')
+        target_node.add_prop('monophyletic_og', 'True')
         target_node.add_prop('lca_dup', node.props.get('lca_node'))
         target_node.add_prop('so_score_dup', node.props.get('so_score'))
 
@@ -149,4 +156,21 @@ def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
 
 
 
+    # """
+        # Find all OGs created under root node
+    # """
+    # ogs_down = set()
+    # dups_down = list()
+    # for n in t.search_nodes(monophyletic_og="True"):
+        # if n.name != t.name:
+            # ogs_down.add(n.name)
+            # dups_down.append(n.up.name)
+
+    # ogs_down_value = ogs_down if len(ogs_down) > 0 else '-'
+    # t.add_prop('ogs_down', ogs_down_value)
+    
+    # dups_down_value = dups_down if len(dups_down) > 0 else '-'
+    # t.add_prop('dups_down', dups_down_value)
+
+    
 

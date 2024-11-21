@@ -26,18 +26,20 @@ RECOVERY PIPELINE
 
 ####    FUNCTIONS FOR RECOVERING SEQUENCES PIPELINE ####
 
-def recover_sequences(tree, t, alg, total_mems_in_tree, total_mems_in_ogs, name_tree, path_out, ogs_info, mode):
+def recover_sequences(t, alg, ogs_info, seqs2recover, name_tree, path_out, run_recovery):
 
-    name_fam = os.path.basename(tree).split('.')[0]
-    pathout = path_out+'/'+name_fam+'aln_hmm'
+    print('RUNNING RECOVERY MODE')
+
+    name_fam = name_tree.replace('.nw', '')
+    pathout = path_out+'/'+name_fam+'@aln_hmm'
     if not os.path.exists(pathout):
         os.mkdir(pathout)
     fasta = alg
 
     # 1. Write a fasta file
-    run_write_fastas(t, fasta, name_tree, pathout, ogs_info, total_mems_in_ogs, total_mems_in_tree, mode)
+    run_write_fastas(t, fasta, ogs_info, name_tree, pathout, seqs2recover, run_recovery)
 
-    if mode == "regular":  # regular mode: Re-aling sequences
+    if run_recovery == "run-align":  # regular mode: Re-aling sequences
         run_alignments(pathout)
     else:
         pass  # we just go with what we had
@@ -51,10 +53,9 @@ def recover_sequences(tree, t, alg, total_mems_in_tree, total_mems_in_ogs, name_
     # 4. For each seq out Core-OGs, select best Core-OGs
     best_match = get_best_match(tblfile)
     recover_seqs = set(best_match.keys())
+    
 
-    t = expand_hmm(t, best_match)
-
-    total_mems_in_ogs.update(recover_seqs)
+    t = expand_hmm(t, best_match, ogs_info)
 
 
     # 9. write_best_match
@@ -62,14 +63,16 @@ def recover_sequences(tree, t, alg, total_mems_in_tree, total_mems_in_ogs, name_
 
     output_filename = path_out+'/'+name_fam+'.tar.gz'
 
+    ogs_info_updated = update_ogs_info(ogs_info, best_match)
+
     # 10. Tar the folder with all the fasta file, HMMs, etc
     make_tarfile(output_filename, pathout)
     shutil.rmtree(pathout)
 
-    return recover_seqs, best_match
+    return recover_seqs, ogs_info_updated
 
 
-def run_write_fastas(t, fasta, name_tree, path_out, ogs_info, total_mems_in_ogs, total_mems_in_tree, mode):
+def run_write_fastas(t, fasta, ogs_info, name_tree, path_out, seqs2recover, run_recovery):
 
     """
         Function calls  write_outog_seqs() AND write_og_seqs_regular_mode() OR write_og_seqs_fast_mode()
@@ -78,73 +81,74 @@ def run_write_fastas(t, fasta, name_tree, path_out, ogs_info, total_mems_in_ogs,
 
     fasta = SeqGroup(fasta)
 
-    diff = (total_mems_in_tree.difference(total_mems_in_ogs))
-
     name_fam = name_tree.split('.')[0]
     not_og_fasta = path_out+'/'+name_fam+'.notOG.faa'
 
-    write_outog_seqs(fasta, diff, not_og_fasta)
+    write_outog_seqs(fasta, seqs2recover, not_og_fasta)
 
-    if mode == "regular":
-        write_og_seqs_regular_mode(t, fasta, ogs_info, path_out)
-    elif mode == "fast":
-        write_og_seqs_fast_mode(t, fasta, ogs_info, path_out)
+    if run_recovery == "run-align":
+        write_og_seqs_re_align(t, fasta, ogs_info, path_out)
+    elif run_recovery == "skip-align":
+        write_og_seqs_skipt_align(t, fasta, ogs_info ,path_out)
 
     return
 
-def write_outog_seqs(fasta, diff, not_og_fasta):
+def write_outog_seqs(fasta, seqs2recover, not_og_fasta):
 
     """
         Write fasta file with seqs that do not belong to any OG
     """
 
     with open(not_og_fasta, 'w') as  f_out:
-        for name_seq in diff:
+        for name_seq in seqs2recover:
             aa = fasta.get_seq(name_seq)
             clean_aa = aa.replace('-','')
             f_out.write('>'+name_seq+'\n'+clean_aa+'\n')
 
-def write_og_seqs_regular_mode(t, fasta, ogs_info, path_out):
+def write_og_seqs_re_align(t, fasta, ogs_info, path_out):
 
     """
         Write one fasta file per each OG
         In regular mode, sequences will be realing, so gaps are removed
     """
 
-    set_trees  = set(t.search_nodes(node_is_og='True'))
+    for og_name, info in ogs_info.items():
+        if '*' in og_name:
+            pass
+        else:
+            lca_og = str(info['TaxoLevel'])
+            mems = info['Mems']
+            with open(path_out+'/'+og_name+'@'+lca_og+'.aln', 'w') as f_out:
+                for m in mems:
+                    aa = fasta.get_seq(m)
+                    clean_aa = aa.replace('-','')
+                    f_out.write('>'+m+'\n'+clean_aa+'\n')
+
+     
 
 
-    for subtree in set_trees:
-        if 'is_root' not in subtree.props:
-            lca = str(subtree.props.get('lca_node'))
-            node_name = subtree.name
-            with open(path_out+'/'+node_name+'_'+lca+'.raw_fasta.faa', 'w') as f_out:
-                list_mems = list(subtree.props.get('leaves_in'))
-                if len(list_mems) >0:
-                    for m in list_mems:
-                        aa = fasta.get_seq(m)
-                        clean_aa = aa.replace('-','')
-                        f_out.write('>'+m+'\n'+clean_aa+'\n')
+ 
 
-def write_og_seqs_fast_mode(t, fasta, ogs_info, path_out):
+
+def write_og_seqs_skipt_align(t, fasta, ogs_info,path_out):
 
     """
         Write one fasta file per each OG
         In fast mode, sequences wont be realing, so gaps are keept
     """
 
-    set_trees  = set(t.search_nodes(node_is_og='True'))
+    for og_name, info in ogs_info.items():
+        if '*' in og_name:
+            pass
+        else:
+            lca_og = str(info['TaxoLevel'])
+            mems = info['Mems']
+            with open(path_out+'/'+og_name+'@'+lca_og+'.aln', 'w') as f_out:
+                for m in mems:
+                    aa = fasta.get_seq(m)
+                    f_out.write('>'+m+'\n'+aa+'\n')
 
-    for subtree in set_trees:
-        if 'is_root' not in subtree.props:
-            lca = str(subtree.props.get('lca_node'))
-            node_name = subtree.name
-            with open(path_out+'/'+node_name+'_'+lca+'.aln', 'w') as f_out:
-                list_mems = list(subtree.props.get('leaves_in'))
-                if len(list_mems) >0:
-                    for m in list_mems:
-                        aa = fasta.get_seq(m)
-                        f_out.write('>'+m+'\n'+aa+'\n')
+   
 
 def run_alignments(path_out):
 
@@ -258,10 +262,10 @@ def write_best_match(best_match, path, name_tree):
     name_fam = name_tree.split('.',1)[0]
     with open(path+'/'+name_fam+'.best_match.tsv', 'w') as fout:
         for seq, best_og in best_match.items():
-            for best_og_name in best_og.keys():
-                fout.write('\t'.join([seq, best_og_name])+'\n')
+            for best_og_name, score in best_og.items():
+                fout.write('\t'.join([seq, best_og_name, str(score)])+'\n')
 
-def expand_hmm(t, best_match):
+def expand_hmm(t, best_match, ogs_info):
 
     """
         Create a dict with all the OGs that have recover some seq
@@ -272,26 +276,29 @@ def expand_hmm(t, best_match):
     for seq_name, best_og in best_match.items():
 
         for k in best_og.keys():
-            best_og_name = k.split('_')[0]
+            best_og_name = k.split('@')[0]
+            best_og_assoc_node = ogs_info[best_og_name]['AssocNode']
 
-            if 'recovery_seqs' in t[best_og_name].props:
-                t[best_og_name].props.get('recovery_seqs').add(seq_name)
+            t[seq_name].add_prop('recover_in',best_og_assoc_node )
+            
+            if 'recover_seqs' in t[best_og_assoc_node].props:
+                t[best_og_assoc_node].props.get('recover_seqs').add(seq_name)
 
             else:
                 recovery_set = set()
                 recovery_set.add(seq_name)
-                t[best_og_name].add_prop('recovery_seqs',  recovery_set)
+                t[best_og_assoc_node].add_prop('recover_seqs',  recovery_set)
 
-
-            if t[best_og_name].props.get('ogs_up') != '-':
-                for nup in t[best_og_name].props.get('ogs_up'):
-                    if 'recovery_seqs' in t[nup].props:
-                        t[nup].props.get('recovery_seqs').add(seq_name)
-
+        
+            for nup in t[best_og_assoc_node].props.get('ogs_up', '-'):
+                if nup != '-':
+                    assoc_node = ogs_info[nup]['AssocNode']
+                    if 'recover_seqs' in t[assoc_node].props:
+                        t[assoc_node].props.get('recover_seqs').add(seq_name)
                     else:
                         recovery_set = set()
                         recovery_set.add(seq_name)
-                        t[nup].add_prop('recovery_seqs',  recovery_set)
+                        t[assoc_node].add_prop('recover_seqs',  recovery_set)
 
     return t
 
@@ -324,3 +331,18 @@ def make_tarfile(output_filename, source_dir):
 
     with tarfile.open(output_filename, "w:gz") as tar:
         tar.add(source_dir, arcname=os.path.basename(source_dir))
+
+
+def update_ogs_info(ogs_info, best_match):
+
+    og2seqs = defaultdict(list)
+    for seq, info_best_og in best_match.items():
+        best_og = list(info_best_og.keys())[0]
+        best_og_info_name = best_og.split('@')[0]
+        og2seqs[best_og_info_name].append(seq)
+        
+    for og, seqs in og2seqs.items():
+        ogs_info[og]['RecoverySeqs'] = ogs_info[og]['RecoverySeqs'] + seqs
+        ogs_info[og]['NumRecoverySeqs'] = str(len(ogs_info[og]['RecoverySeqs']))
+
+    return ogs_info

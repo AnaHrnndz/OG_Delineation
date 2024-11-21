@@ -60,53 +60,7 @@ def get_so2use(taxonomy_db, lin_lca, lca_node,args):
         else:
             so_2_use = args.so_all
 
-        # elif args.so_specf == None and  args.so_lin == None:
-            # so_2_use = args.so_all
-
-        # elif args.so_lin != None and args.so_specf == None:
-            # lev = int(args.so_lin[0])
-            # so = args.so_lin[1]
-            # if lev in lin_lca:
-                # so_2_use = so
-            # else:
-                # so_2_use = args.so_all
-
-        # elif args.so_specf != None and args.so_lin == None:
-            # lev = int(args.so_specf[0])
-            # so = args.so_specf[1]
-            # if lev == lca_node :
-                # so_2_use = so
-            # else:
-                # so_2_use = args.so_all
-
-        # elif args.so_specf != None and args.so_lin != None:
-            # lev_only = int(args.so_specf[0])
-            # lev_from = int(args.so_lin[0])
-           
-            # if lev_only == lca_node :
-                # so = args.so_specf[1]
-                # so_2_use = so
-            # elif lev_from in lin_lca:
-                # so = args.so_lin[1]
-                # so_2_use = so
-            # else:
-                # so_2_use = args.so_all
-
         
-        
-        #if  in lin_lca:
-        #    so_2_use = args.so_bact
-        #elif 2759 in lin_lca:
-        #    so_2_use = args.so_euk
-        #elif 2157 in lin_lca:
-        #    so_2_use = args.so_arq
-        #elif 131567 in lin_lca:
-        #    so_2_use = args.so_cell_org
-        #elif 'Empty' in lin_lca:
-        #    so_2_use = 0.0
-        #
-        #else:
-        #    so_2_use = args.so_all
         
 
     elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
@@ -121,8 +75,6 @@ def get_so2use(taxonomy_db, lin_lca, lca_node,args):
             so_2_use = 0.0
         else:
             so_2_use = args.so_all
-
-
 
     
     return so_2_use
@@ -182,16 +134,24 @@ def check_nodes_up(node):
 
     ogs_up = set()
     dups_up = list()
+    
     while node.up:
-        if node.up.props.get('node_is_og'):
+        if node.up.props.get('monophyletic_og'):
+           
             if not node.up.props.get('is_root'):
-                ogs_up.add(node.up.props.get('name'))
+                ogs_up.add(node.up.props.get('mog_name'))
                 dups_up.append(node.up.up.props.get('name'))
             else:
-                ogs_up.add(node.up.props.get('name'))
+                ogs_up.add('-')
+                #ogs_up.add(node.up.props.get('mog_name', '-'))
         node = node.up
 
+    
+
     return ogs_up, dups_up
+
+
+
 
 
 
@@ -207,3 +167,10 @@ def run_write_post_tree(t, name_tree, path_out, all_props):
     t.write(outfile=post_tree, props=all_props, format_root_node = True)
 
     return
+
+
+def write_tree_for_minvar_rootin(t, tmp_path):
+    input_tree_minvar = tmp_path+'input_tree_minvar.nw'
+    t.write(outfile=input_tree_minvar, format_root_node = True)
+
+    return input_tree_minvar

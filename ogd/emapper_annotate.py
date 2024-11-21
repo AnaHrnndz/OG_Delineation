@@ -102,7 +102,7 @@ def annot_treeprofiler(t, path2raw, path2main_table, path2pfam_table, tmp_path )
     #Open again the tree:
     path2tree_treprofiler = glob.glob(tmp_path+'/*_annotated.nw')[0]
     
-    t = PhyloTree(open(path2tree_treprofiler), parser = 1)
+    t = PhyloTree(open(path2tree_treprofiler), parser = 0)
     
     return t
     
