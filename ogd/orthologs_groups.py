@@ -4,13 +4,13 @@ import utils
 
 
 
-def get_all_ogs(t, taxonomy_db):
+def get_all_ogs(t, taxonomy_db, clean_name_tree):
 
     #   5.1. Get Monophyletic OGs
-    monophyletic_ogs_annot, seqs_in_mono_ogs, count = get_monophyletic_ogs(t, taxonomy_db)
+    monophyletic_ogs_annot, seqs_in_mono_ogs, count = get_monophyletic_ogs(t, taxonomy_db, clean_name_tree)
  
     #   5.2 Get Paraphyletic OGs
-    t,  paraphyletic_ogs_annot, seqs_in_para_ogs, c = get_paraphyletic_ogs(t, taxonomy_db)
+    t,  paraphyletic_ogs_annot, seqs_in_para_ogs, c = get_paraphyletic_ogs(t, taxonomy_db, clean_name_tree)
 
     #   5.3 Chech OGs in root
     annot_ogs_in_root, seqs_in_root = root_ogs(t, taxonomy_db, count, c)
@@ -48,13 +48,14 @@ def get_all_ogs(t, taxonomy_db):
 
 
 #  Functions for monophyletic OGs
-def get_monophyletic_ogs(t,  taxonomy_db):
+def get_monophyletic_ogs(t,  taxonomy_db, clean_name_tree):
 
     """
         Return a dict with the info for all monophyletic OGs 
     """
 
     set_trees  = set(t.search_nodes(monophyletic_og='True'))
+    
 
     monophyletic_ogs = defaultdict(dict)
     count = 0
@@ -72,7 +73,7 @@ def get_monophyletic_ogs(t,  taxonomy_db):
             elif  subtree.props.get('lca_dup') == None:
                 lca_subtree = str(subtree.props.get('lca_node'))
 
-            name = 'mono_OG_'+str(count)
+            name = clean_name_tree+'@mono_OG_'+str(count)
             count+=1
 
             if len(all_leaves_subtree) >=1:
@@ -138,7 +139,7 @@ def annot_monophyletic_ogs(t, monophyletic_ogs, taxonomy_db):
 
 
 #  Functions for paraphyletic OGs
-def get_paraphyletic_ogs(t, taxonomy_db):
+def get_paraphyletic_ogs(t, taxonomy_db, clean_name_tree):
 
     """
     Recuperar las seqs que se hayan podido "escapar" entre OGs
@@ -179,7 +180,7 @@ def get_paraphyletic_ogs(t, taxonomy_db):
                             diff = all_mems.difference(mem2remove)
                             if  len(diff)>1:
 
-                                name = 'para_OG_'+str(c)
+                                name = clean_name_tree+'#para_OG_'+str(c)
                                 c+=1
                                 ch.add_prop('paraphyletic_og', 'True')
                                 ch.add_prop('pog_name', name)

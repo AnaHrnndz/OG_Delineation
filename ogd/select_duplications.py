@@ -155,22 +155,3 @@ def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
 
 
 
-
-    # """
-        # Find all OGs created under root node
-    # """
-    # ogs_down = set()
-    # dups_down = list()
-    # for n in t.search_nodes(monophyletic_og="True"):
-        # if n.name != t.name:
-            # ogs_down.add(n.name)
-            # dups_down.append(n.up.name)
-
-    # ogs_down_value = ogs_down if len(ogs_down) > 0 else '-'
-    # t.add_prop('ogs_down', ogs_down_value)
-    
-    # dups_down_value = dups_down if len(dups_down) > 0 else '-'
-    # t.add_prop('dups_down', dups_down_value)
-
-    
-

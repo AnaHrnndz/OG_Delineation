@@ -57,7 +57,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             leaves_out = set()
             sp_in = list()
             leaves_in = set()
-            leaves_in_nodes = set()
+            #leaves_in_nodes = set()
 
             #Add outliers from upper nodes
             if args.inherit_out == 'Yes':
@@ -95,7 +95,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
                 else:
                     sp_in.append(str(l.props.get('taxid')))
                     leaves_in.add(l.props.get('name'))
-                    leaves_in_nodes.add(l)
+                    #leaves_in_nodes.add(l)
 
                     if l.name in ch1_leaf_names:
                         sp_ch1.add(str(l.props.get('taxid')))
@@ -110,7 +110,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
 
             if len(overlaped_spces)>0:
                 so_score = float(len(overlaped_spces) / len(set(sp_in)))
-                n.add_prop('overlap', list(overlaped_spces))
+                n.add_prop('overlaped_species', list(overlaped_spces))
             else:
                 so_score = 0.0
 
@@ -129,7 +129,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             n.add_prop('ch1_name', ch1_name)
             n.add_prop('ch2_name', ch2_name)
             n.add_prop('leaves_in', leaves_in)
-            n.add_prop('leaves_in_nodes', leaves_in_nodes)
+            #n.add_prop('leaves_in_nodes', leaves_in_nodes)
             n.add_prop('total_leaves', len(n))
             n.add_prop('len_leaves_in', len(leaves_in))
             n.add_prop('len_leaves_out', len(leaves_out))
@@ -137,10 +137,12 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             n.add_prop('leaves_ch2',list(leaves_ch2))
             n.add_prop('leaves_out', list(leaves_out))
             n.add_prop('so_score', so_score)
-            if len(sp_out) == 0:
-                n.add_prop('sp_out', list())
-            else:
-                n.add_prop('sp_out', list(sp_out))
+            n.add_prop('sp_out', list(sp_out))
+
+            # if len(sp_out) == 0:
+                # n.add_prop('sp_out', list())
+            # else:
+                # n.add_prop('sp_out', list(sp_out))
 
 
             #   Load_node_scores add properties: score1, score2 and inpalalogs_rate
@@ -158,6 +160,9 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
 
             #call_species_lost(n, reftree)
 
+            #   Calculate lost species from expected number of species
+            #   Expected number of species is the number of species in the original reftree
+            #   for the lineage corresponding to the LCA of the node.
             sp_lost(n, level2sp_mem)
 
 

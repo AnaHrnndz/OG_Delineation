@@ -160,7 +160,7 @@ def load_taxonomy_counter(reftree=None, user_taxonomy_counter=None):
 
         level2sp_mem = get_taxonomy_counter(reftree)
 
-    
+   
     return level2sp_mem
 
 
@@ -313,6 +313,8 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     0. Load info"""
     print(mssg)
 
+    clean_name_tree = utils.remove_problematic_characters(name_tree)
+
     t = load_tree_local(tree = tree, taxonomy = args.taxonomy_type, sp_delimitator = args.sp_delim)
     taxonomy_db = load_taxonomy(taxonomy = args.taxonomy_type, user_taxonomy= args.user_taxonomy)
     reftree = load_reftree(rtree = args.reftree, t = t, taxonomy_db = taxonomy_db)
@@ -321,7 +323,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     
 
     # 2. Tree setup (Pre-analysis):  resolve polytomies, rooting, ncbi annotation, etc
-    t_nw , sp_set, total_mems_in_tree, num_total_sp, user_props = run_setup(t, name_tree, taxonomy_db, args.rooting, path_out, abs_path, args.sp_delim)
+    t_nw , sp_set, total_mems_in_tree, num_total_sp = run_setup(t, name_tree, taxonomy_db, path_out, args)
     
 
     # 3. Outliers and Dups score functions
@@ -333,7 +335,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
 
 
     # 5. Get Monophyletic and Paraphyletic OGs
-    t, ogs_info, seqs_in_ogs = get_all_ogs(t, taxonomy_db)
+    t, ogs_info, seqs_in_ogs = get_all_ogs(t, taxonomy_db, clean_name_tree)
 
 
     # 6. Optionally skip get all orthologs pairs

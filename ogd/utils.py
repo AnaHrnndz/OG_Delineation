@@ -151,7 +151,9 @@ def check_nodes_up(node):
     return ogs_up, dups_up
 
 
-
+def remove_problematic_characters(name):
+    clean_name = name.replace('-','|')
+    return clean_name
 
 
 

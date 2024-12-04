@@ -7,7 +7,7 @@ import re
 
 chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
-def run_setup(t, name_tree, taxonomy_db, rooting, path_out, abs_path, sp_delimitator):
+def run_setup(t, name_tree, taxonomy_db, path_out, args):
 
 
     """
@@ -19,11 +19,15 @@ def run_setup(t, name_tree, taxonomy_db, rooting, path_out, abs_path, sp_delimit
             Name internal nodes
     """
 
+    rooting = args.rooting
+
+    sp_delimitator = args.sp_delim
+
     t.resolve_polytomy()
 
     t = check_branch_legth(t)
 
-    t = run_rooting(t, rooting, path_out, abs_path, sp_delimitator)
+    t = run_rooting(t, rooting, path_out, sp_delimitator)
 
     t = add_taxomical_annotation(t, taxonomy_db)
 
@@ -50,7 +54,7 @@ def run_setup(t, name_tree, taxonomy_db, rooting, path_out, abs_path, sp_delimit
     t, props = utils.run_clean_properties(t)
     tree_nw = utils.get_newick(t, props)
 
-    return tree_nw, set_sp_total, total_mems_in_tree, num_total_sp, props
+    return tree_nw, set_sp_total, total_mems_in_tree, num_total_sp
 
 
 
@@ -75,7 +79,7 @@ def check_branch_legth(t):
     return t
 
 
-def run_rooting(t, rooting, path_out, abs_path, sp_delimitator):
+def run_rooting(t, rooting, path_out, sp_delimitator):
 
     """
         Tree rooting.
@@ -90,7 +94,7 @@ def run_rooting(t, rooting, path_out, abs_path, sp_delimitator):
             print('Error in Midpoint')
 
     elif rooting == "MinVar":
-        t = run_minvar(t, path_out, abs_path, sp_delimitator)
+        t = run_minvar(t, path_out, sp_delimitator)
 
     else:
         print('No rooting')
@@ -98,7 +102,7 @@ def run_rooting(t, rooting, path_out, abs_path, sp_delimitator):
     return t
 
 
-def run_minvar(t, path_out, abs_path, sp_delimitator):
+def run_minvar(t, path_out, sp_delimitator):
 
     """
         With MinVar rooting, you need to :
@@ -122,6 +126,8 @@ def run_minvar(t, path_out, abs_path, sp_delimitator):
     stderr_file.close()
 
     t_minvar = PhyloTree(open(path2tmptree), parser = 0)
+
+    #check that minvar run and its not oppening an old tree from previous run
 
     t_minvar.set_species_naming_function(lambda node: node.name.split(sp_delimitator)[0])
 

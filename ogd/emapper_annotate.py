@@ -24,6 +24,8 @@ def annotate_with_emapper(t, alg, tmp_path):
     path2main_table = run_emapper(path2raw, tmp_path)
     path2pfam_table = run_hmm_mapper(path2raw, tmp_path)
 
+    print('**********')
+
     t = annot_treeprofiler(t, alg, path2main_table, path2pfam_table, tmp_path)
 
     # t = annot_tree_pfam_table(t, path2pfam_table, alg)
