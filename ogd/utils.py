@@ -142,7 +142,8 @@ def check_nodes_up(node):
                 ogs_up.add(node.up.props.get('mog_name'))
                 dups_up.append(node.up.up.props.get('name'))
             else:
-                ogs_up.add('-')
+                pass
+                #ogs_up.add('-')
                 #ogs_up.add(node.up.props.get('mog_name', '-'))
         node = node.up
 
@@ -152,7 +153,8 @@ def check_nodes_up(node):
 
 
 def remove_problematic_characters(name):
-    clean_name = name.replace('-','|')
+    clean_name = name.replace('-','|').replace('.faa', '').replace('.nw', '').replace('.fa', '').replace('.fasta','')
+
     return clean_name
 
 

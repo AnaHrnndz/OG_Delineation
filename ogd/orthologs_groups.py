@@ -13,7 +13,7 @@ def get_all_ogs(t, taxonomy_db, clean_name_tree):
     t,  paraphyletic_ogs_annot, seqs_in_para_ogs, c = get_paraphyletic_ogs(t, taxonomy_db, clean_name_tree)
 
     #   5.3 Chech OGs in root
-    annot_ogs_in_root, seqs_in_root = root_ogs(t, taxonomy_db, count, c)
+    annot_ogs_in_root, seqs_in_root = root_ogs(t, taxonomy_db, count, c, clean_name_tree)
     
 
     #   5.3 Join OGs dictionaries
@@ -180,7 +180,7 @@ def get_paraphyletic_ogs(t, taxonomy_db, clean_name_tree):
                             diff = all_mems.difference(mem2remove)
                             if  len(diff)>1:
 
-                                name = clean_name_tree+'#para_OG_'+str(c)
+                                name = clean_name_tree+'@para_OG_'+str(c)
                                 c+=1
                                 ch.add_prop('paraphyletic_og', 'True')
                                 ch.add_prop('pog_name', name)
@@ -243,7 +243,7 @@ def annot_paraphyletic_ogs(t, paraphyletic_ogs, taxonomy_db):
 
 
 #   OGs in root
-def root_ogs(t, taxonomy_db, count, c):
+def root_ogs(t, taxonomy_db, count, c, clean_name_tree):
 
     """
     If root's lca is different than LUCA, 
@@ -278,7 +278,7 @@ def root_ogs(t, taxonomy_db, count, c):
             
 
             count +=1
-            og_name='mono_OG_'+str(count)
+            og_name = clean_name_tree+'@mono_OG_'+str(count)
 
             if taxa != lca_tree:
                 og_name = og_name+'*'
@@ -330,7 +330,7 @@ def root_ogs(t, taxonomy_db, count, c):
                             mem2remove.update(n_.props.get('leaves_in'))
                         diff = all_mems.difference(mem2remove)
                         if  len(diff)>1:
-                                name = 'para_OG_'+str(c)
+                                name = clean_name_tree+'@para_OG_'+str(c)
                                 c+=1
                                 ch.add_prop('paraphyletic_og', 'True')
                                 ch.add_prop('pog_name', name)
@@ -347,7 +347,7 @@ def root_ogs(t, taxonomy_db, count, c):
                         mem2remove.update(n_.props.get('leaves_in'))
                     diff = all_mems.difference(mem2remove)
                     if  len(diff)>1:
-                            name = 'para_OG_'+str(c)
+                            name = clean_name_tree+'@para_OG_'+str(c)
                             c+=1
                             t.add_prop('paraphyletic_og', 'True')
                             t.add_prop('pog_name', name)
@@ -433,19 +433,15 @@ def hierarchy_ogs(t, ogs_info):
                 dups_up = list()
                 ogs_up, dups_up = utils.check_nodes_up(node)
                 
-
-
-
+               
                 # Search for paraphyletic OGs 
                 para_ogs_up = check_pogs_up(node)
                 ogs_up.update(para_ogs_up)
 
                
-
-
                 ogs_up_value = ogs_up if len(ogs_up) > 0 else ['-']
                 node.add_prop('ogs_up', ogs_up_value)
-
+             
                 dups_up_value = dups_up if len(dups_up) > 0 else ['-']
                 node.add_prop('dups_up', dups_up_value)
 
@@ -460,7 +456,6 @@ def hierarchy_ogs(t, ogs_info):
         info['OG_down'] = ogs_down
         info['OG_up'] = ogs_up
 
-    
 
     return t, ogs_info
 

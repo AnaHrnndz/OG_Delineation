@@ -50,6 +50,7 @@ def write_ogs_info(ogs_info, name_tree, path):
 
             ogs_down = '|'.join(list(ogs_info[og_name]['OG_down']))
             ogs_up = '|'.join(list(ogs_info[og_name]['OG_up']))
+            sp_outliers = '|'.join(ogs_info[og_name]['Species_Outliers'])
             seqs = ','.join(ogs_info[og_name]['Mems'])
             if len(ogs_info[og_name]['RecoverySeqs']) == 0:
                 rec_seqs = '-'
@@ -66,11 +67,11 @@ def write_ogs_info(ogs_info, name_tree, path):
                 ogs_up ,  #7
                 ogs_info[og_name]['NumMems'], #8
                 ogs_info[og_name]['NumRecoverySeqs'], #9
-                ogs_info[og_name]['Lca_Dup'],
-                ogs_info[og_name]['Species_Outliers'],
-                ogs_info[og_name]['Num_SP_Outliers'],
-                ogs_info[og_name]['Inparalogs_Rate'],
-                ogs_info[og_name]['SP_overlap_dup'],
-                seqs, #10
-                rec_seqs #11
+                ogs_info[og_name]['Lca_Dup'], #10
+                sp_outliers, #11
+                ogs_info[og_name]['Num_SP_Outliers'], #12
+                ogs_info[og_name]['Inparalogs_Rate'], #13
+                ogs_info[og_name]['SP_overlap_dup'], #14
+                seqs, #16
+                rec_seqs #16
             ))
