@@ -1,6 +1,7 @@
 import re
 import csv
 import pathlib
+import json
 from collections import defaultdict
 
 
@@ -26,12 +27,23 @@ def write_seq2ogs(seq2ogs, path, name_tree):
         Write a table with seq2ogs info
     """
 
+    
     name_fam = name_tree.split('.')[0]
+    seq2og_list =[]
     seq2ogs_out = open(path+'/'+name_fam+'.seq2ogs.tsv', 'w')
     for seq, ogs in seq2ogs.items():
+        seq2og_list.append({seq:list(ogs)})
         seq2ogs_out.write(seq+'\t'+'|'.join(list(ogs))+'\n')
 
     seq2ogs_out.close()
+
+    seq2ogs_json = (path+'/'+name_fam+'.seq2ogs.jsonl')
+    with open(seq2ogs_json, "w") as file:
+        for seq in seq2og_list:
+            file.write(json.dumps(seq) + "\n")
+    
+
+
 
 
 

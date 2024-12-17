@@ -115,8 +115,10 @@ def annot_monophyletic_ogs(t, monophyletic_ogs, taxonomy_db):
         
         sp_in_og = t[subtree_name].props.get('sp_in')
         lca_dup = t[subtree_name].props.get('lca_dup')
-        sp_outliers = t[subtree_name].props.get('sp_out') 
+        sp_outliers = t[subtree_name].props.get('sp_out')
         len_sp_outliers = len(sp_outliers)
+        if len_sp_outliers == 0:
+                sp_outliers = '-'
         inparalogs_rate = t[subtree_name].props.get('inparalogs_rate')
         species_overlap = t[subtree_name].props.get('so_score_dup')
             
@@ -235,7 +237,7 @@ def annot_paraphyletic_ogs(t, paraphyletic_ogs, taxonomy_db):
         annot_para_ogs[pog_name]['Mems'] = list(seqs_in)
         annot_para_ogs[pog_name]['Lca_Dup'] = '-'
         annot_para_ogs[pog_name]['Species_Outliers'] = '-'
-        annot_para_ogs[pog_name]['Num_SP_Outliers'] = '-'
+        annot_para_ogs[pog_name]['Num_SP_Outliers'] = '0'
         annot_para_ogs[pog_name]['Inparalogs_Rate'] = '-'
         annot_para_ogs[pog_name]['SP_overlap_dup'] = '-'
 
@@ -285,8 +287,10 @@ def root_ogs(t, taxonomy_db, count, c, clean_name_tree):
             
             sp_in_og = t.props.get('sp_in')
             lca_dup = '-'
-            sp_outliers = t.props.get('sp_out') 
+            sp_outliers = t.props.get('sp_out', '-')
             len_sp_outliers = len(sp_outliers)
+            if len_sp_outliers == 0:
+                sp_outliers = '-'
             inparalogs_rate = t.props.get('inparalogs_rate')
             species_overlap = t.props.get('so_score')
             
