@@ -168,7 +168,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
 
             if n.up:
                 sp_in_pnode = n.up.props.get('sp_in')
-                lin_lost_from_pnode = best_lin_lost(expected_sp=sp_in_pnode, found_sp=set(sp_in), taxonomy_db=taxonomy_db)
+                lin_lost_from_pnode = '@'.join(map(str, best_lin_lost(expected_sp=sp_in_pnode, found_sp=set(sp_in), taxonomy_db=taxonomy_db)))
                 n.add_prop('lost_from_uppernode', lin_lost_from_pnode)
 
 
@@ -505,14 +505,15 @@ def best_lin_lost(expected_sp, found_sp, taxonomy_db):
     depths_list = (list(ptax.keys()))
     depths_list.sort()
 
-    best_loss = defaultdict(dict)
+    best_loss = []
 
     for depth in depths_list:
         if depth not in [1, 2]:
             for tax, perc in ptax[depth].items():
 
                 if  perc >=0.80:
-                    best_loss[depth][tax] = perc
+                    best_loss = [tax, perc]
+                    break
     
     return best_loss
 
