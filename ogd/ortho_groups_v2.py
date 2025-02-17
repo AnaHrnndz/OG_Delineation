@@ -7,20 +7,21 @@ import utils
 def get_all_ogs(t, taxonomy_db, clean_name_tree):
 
     #   5.1. Get Monophyletic OGs
-    monophyletic_ogs_annot, seqs_in_mono_ogs, count = get_monophyletic_ogs(t, taxonomy_db, clean_name_tree)
+    ogs_info = defaultdict()
+    seqs_in_mono_ogs, count = get_monophyletic_ogs(t, taxonomy_db, clean_name_tree, ogs_info)
  
     #   5.2 Get Paraphyletic OGs
-    t,  paraphyletic_ogs_annot, seqs_in_para_ogs, c = get_paraphyletic_ogs(t, taxonomy_db, clean_name_tree)
+    t, seqs_in_para_ogs, c = get_paraphyletic_ogs(t, taxonomy_db, clean_name_tree, ogs_info)
 
     #   5.3 Chech OGs in root
-    annot_ogs_in_root, seqs_in_root = root_ogs(t, taxonomy_db, count, c, clean_name_tree)
+    seqs_in_root = root_ogs(t, taxonomy_db, count, c, clean_name_tree, ogs_info)
     
 
     #   5.3 Join OGs dictionaries
-    ogs_info = defaultdict()
-    ogs_info.update(monophyletic_ogs_annot)
-    ogs_info.update(paraphyletic_ogs_annot)
-    ogs_info.update(annot_ogs_in_root)
+    
+    # ogs_info.update(monophyletic_ogs_annot)
+    # ogs_info.update(paraphyletic_ogs_annot)
+    # # ogs_info.update(annot_ogs_in_root)
 
 
     #   5.4 Get hierarchical structure of OGs (mono and paraphyletic)
@@ -44,11 +45,35 @@ def get_all_ogs(t, taxonomy_db, clean_name_tree):
 
 
 
+def add_entry_to_ogs_info(ogs_info, values):
+    """
+    Añade una nueva entrada al diccionario ogs_info con la estructura dada.
+    """
+    og_name, lca, sci_name_taxa, assoc_node, sp_in_og, seqs_in, lca_dup, sp_outliers, inparalogs_rate, species_overlap = values
+
+    if len(sp_outliers) == 0:
+        len_sp_out = '0'
+    else:
+        len_sp_out = len(sp_outliers)
+    
+    ogs_info[og_name] = {
+        'TaxoLevel': lca,
+        'SciName_TaxoLevel': sci_name_taxa.replace(' ', '_'),
+        'AssocNode': assoc_node,
+        'NumSP': len(sp_in_og),
+        'NumMems': len(seqs_in),
+        'Mems': list(seqs_in),
+        'Lca_Dup': lca_dup,
+        'Species_Outliers': sp_outliers,
+        'Num_SP_Outliers': len_sp_out,
+        'Inparalogs_Rate': inparalogs_rate,
+        'SP_overlap_dup': species_overlap
+    } 
 
 
 
 #  Functions for monophyletic OGs
-def get_monophyletic_ogs(t,  taxonomy_db, clean_name_tree):
+def get_monophyletic_ogs(t,  taxonomy_db, clean_name_tree, ogs_info):
 
     """
         Return a dict with the info for all monophyletic OGs 
@@ -82,12 +107,12 @@ def get_monophyletic_ogs(t,  taxonomy_db, clean_name_tree):
 
 
     # Annot all monophyletic OGs
-    monophyletic_ogs_annot, seqs_in_mono_ogs = annot_monophyletic_ogs(t, monophyletic_ogs, taxonomy_db) 
+    seqs_in_mono_ogs = annot_monophyletic_ogs(t, monophyletic_ogs, taxonomy_db, ogs_info) 
 
-    return monophyletic_ogs_annot, seqs_in_mono_ogs, count 
+    return  seqs_in_mono_ogs, count 
 
 
-def annot_monophyletic_ogs(t, monophyletic_ogs, taxonomy_db):
+def annot_monophyletic_ogs(t, monophyletic_ogs, taxonomy_db, ogs_info):
 
 
     """
@@ -97,7 +122,6 @@ def annot_monophyletic_ogs(t, monophyletic_ogs, taxonomy_db):
             ##OG_name   TaxoLevel   AssocNode  lensp_in_OG  OG_up   OG_down  num_OG_mems    members
     """
     
-    annot_mono_ogs = defaultdict(dict)
     seqs_in_mono_ogs = set()
     
     for og_name, og_info in monophyletic_ogs.items():
@@ -122,26 +146,19 @@ def annot_monophyletic_ogs(t, monophyletic_ogs, taxonomy_db):
         inparalogs_rate = t[subtree_name].props.get('inparalogs_rate')
         species_overlap = t[subtree_name].props.get('so_score_dup')
             
-        annot_mono_ogs[og_name]['TaxoLevel'] = lca_subtree
-        annot_mono_ogs[og_name]['SciName_TaxoLevel'] = sci_name_taxa.replace(' ', '_')
-        annot_mono_ogs[og_name]['AssocNode'] = subtree_name
-        annot_mono_ogs[og_name]['NumSP'] = len(sp_in_og)
-        annot_mono_ogs[og_name]['NumMems'] = len(list_seqs_in)
-        annot_mono_ogs[og_name]['Mems'] = list_seqs_in
-        annot_mono_ogs[og_name]['Lca_Dup'] = lca_dup
-        annot_mono_ogs[og_name]['Species_Outliers'] = sp_outliers
-        annot_mono_ogs[og_name]['Num_SP_Outliers'] = len_sp_outliers
-        annot_mono_ogs[og_name]['Inparalogs_Rate'] = inparalogs_rate
-        annot_mono_ogs[og_name]['SP_overlap_dup'] = species_overlap
+        values = [og_name, lca_subtree, sci_name_taxa, subtree_name, sp_in_og, list_seqs_in, lca_dup, sp_outliers, inparalogs_rate, species_overlap]
+        add_entry_to_ogs_info(ogs_info, values)
+
 
         seqs_in_mono_ogs.update(set(list_seqs_in))
 
-    return annot_mono_ogs, seqs_in_mono_ogs
+    return seqs_in_mono_ogs
+
 
 
 
 #  Functions for paraphyletic OGs
-def get_paraphyletic_ogs(t, taxonomy_db, clean_name_tree):
+def get_paraphyletic_ogs(t, taxonomy_db, clean_name_tree, ogs_info) :
 
     """
     Recuperar las seqs que se hayan podido "escapar" entre OGs
@@ -190,14 +207,13 @@ def get_paraphyletic_ogs(t, taxonomy_db, clean_name_tree):
                                 paraphyletic_ogs[name] = [ch.name, str(lca_ch), (list(diff))]
 
     # Annot all the paraphyletic OGs
-    paraphyletic_ogs_annot, seqs_in_para_ogs = annot_paraphyletic_ogs(t, paraphyletic_ogs, taxonomy_db) 
+    seqs_in_para_ogs = annot_paraphyletic_ogs(t, paraphyletic_ogs, taxonomy_db, ogs_info) 
 
-    return t,  paraphyletic_ogs_annot, seqs_in_para_ogs, c
+    return t, seqs_in_para_ogs, c
 
 
-def annot_paraphyletic_ogs(t, paraphyletic_ogs, taxonomy_db):
+def annot_paraphyletic_ogs(t, paraphyletic_ogs, taxonomy_db, ogs_info):
 
-    annot_para_ogs = defaultdict(dict)
     seqs_in_para_ogs = set()
 
     for pog_name, info in paraphyletic_ogs.items():
@@ -228,24 +244,19 @@ def annot_paraphyletic_ogs(t, paraphyletic_ogs, taxonomy_db):
                 old_pOG = pog_node[lname].props.get('pOG', str())
                 new_pOG = old_pOG+'@'+pog_name
                 pog_node[lname].add_prop('pOG', new_pOG)
-                
-        annot_para_ogs[pog_name]['TaxoLevel'] = lca_pog
-        annot_para_ogs[pog_name]['SciName_TaxoLevel'] = sci_name_taxa.replace(' ', '_')
-        annot_para_ogs[pog_name]['AssocNode'] = assoc_node
-        annot_para_ogs[pog_name]['NumSP'] = len(sp_in_og)
-        annot_para_ogs[pog_name]['NumMems'] = len(seqs_in)
-        annot_para_ogs[pog_name]['Mems'] = list(seqs_in)
-        annot_para_ogs[pog_name]['Lca_Dup'] = '-'
-        annot_para_ogs[pog_name]['Species_Outliers'] = '-'
-        annot_para_ogs[pog_name]['Num_SP_Outliers'] = '0'
-        annot_para_ogs[pog_name]['Inparalogs_Rate'] = '-'
-        annot_para_ogs[pog_name]['SP_overlap_dup'] = '-'
 
-    return annot_para_ogs, seqs_in_para_ogs
+        lca_dup = '-'
+        sp_outliers = list()
+        inparalogs_rate = '-'
+        species_overlap = '-'
+        values = [pog_name, lca_pog, sci_name_taxa, assoc_node, sp_in_og, seqs_in, lca_dup, sp_outliers, inparalogs_rate, species_overlap]
+        add_entry_to_ogs_info(ogs_info, values)
+                
+    return seqs_in_para_ogs
 
 
 #   OGs in root
-def root_ogs(t, taxonomy_db, count, c, clean_name_tree):
+def root_ogs(t, taxonomy_db, count, c, clean_name_tree, ogs_info):
 
     """
     If root's lca is different than LUCA, 
@@ -262,54 +273,16 @@ def root_ogs(t, taxonomy_db, count, c, clean_name_tree):
         if lca_tree != 'r_root':
             fromluca2lcatree = taxonomy_db.get_name_lineage([lca_tree])[0][lca_tree]
 
+    # Remove taxid 1 == root
+    fromluca2lcatree.remove(1)
     annot_ogs_in_root = defaultdict(dict)
     seqs_in_root = set()
 
-    # First chech if root is monophyletic og
-    if 'monophyletic_og' in t.props.keys():
-        
-       
-        list_seqs_in = t.props.get('leaves_in')
-        seqs_in_root.update(list_seqs_in)
-        for taxa in fromluca2lcatree:
-            if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-                sci_name_taxa =  taxonomy_db.get_taxid_translator([taxa])[int(taxa)]
-            elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
-                sci_name_taxa = taxa
-            
-            count +=1
-            og_name = clean_name_tree+'@mono_OG_'+str(count)
 
-            if taxa != lca_tree:
-                og_name = og_name+'*'
-            
-            sp_in_og = t.props.get('sp_in')
-            lca_dup = '-'
-            sp_outliers = t.props.get('sp_out', '-')
-            len_sp_outliers = len(sp_outliers)
-            if len_sp_outliers == 0:
-                sp_outliers = '-'
-            inparalogs_rate = t.props.get('inparalogs_rate')
-            species_overlap = t.props.get('so_score')
-            
-            annot_ogs_in_root[og_name]['TaxoLevel'] = taxa
-            annot_ogs_in_root[og_name]['SciName_TaxoLevel'] = sci_name_taxa.replace(' ', '_')
-            annot_ogs_in_root[og_name]['AssocNode'] = t.name
-            annot_ogs_in_root[og_name]['NumSP'] = len(sp_in_og)
-            annot_ogs_in_root[og_name]['NumMems'] = len(list_seqs_in)
-            annot_ogs_in_root[og_name]['Mems'] = list_seqs_in
-            annot_ogs_in_root[og_name]['Lca_Dup'] = lca_dup
-            annot_ogs_in_root[og_name]['Species_Outliers'] = sp_outliers
-            annot_ogs_in_root[og_name]['Num_SP_Outliers'] = len_sp_outliers
-            annot_ogs_in_root[og_name]['Inparalogs_Rate'] = inparalogs_rate
-            annot_ogs_in_root[og_name]['SP_overlap_dup'] = species_overlap
-
-    
-    else:
-        para_ogs_root = dict()
-        
-        # Check if root child's are monophyletic OG, if both childs are OGs, then there are not any paraphyletic OG at root level 
-        if t.children[0].props.get('monophyletic_og') == 'True' and t.children[1].props.get('monophyletic_og') == 'True':
+    #Si el lca es cell org, 
+    if t.props.get("lca_node") == 131567:
+        if t.props.get('monophyletic_og') == 'True':
+           
             list_seqs_in = t.props.get('leaves_in')
             seqs_in_root.update(list_seqs_in)
             for taxa in fromluca2lcatree:
@@ -333,19 +306,18 @@ def root_ogs(t, taxonomy_db, count, c, clean_name_tree):
                 inparalogs_rate = t.props.get('inparalogs_rate')
                 species_overlap = t.props.get('so_score')
 
-                annot_ogs_in_root[og_name]['TaxoLevel'] = taxa
-                annot_ogs_in_root[og_name]['SciName_TaxoLevel'] = sci_name_taxa.replace(' ', '_')
-                annot_ogs_in_root[og_name]['AssocNode'] = t.name
-                annot_ogs_in_root[og_name]['NumSP'] = len(sp_in_og)
-                annot_ogs_in_root[og_name]['NumMems'] = len(list_seqs_in)
-                annot_ogs_in_root[og_name]['Mems'] = list_seqs_in
-                annot_ogs_in_root[og_name]['Lca_Dup'] = lca_dup
-                annot_ogs_in_root[og_name]['Species_Outliers'] = sp_outliers
-                annot_ogs_in_root[og_name]['Num_SP_Outliers'] = len_sp_outliers
-                annot_ogs_in_root[og_name]['Inparalogs_Rate'] = inparalogs_rate
-                annot_ogs_in_root[og_name]['SP_overlap_dup'] = species_overlap
 
+                values = [og_name, taxa, sci_name_taxa, t.name, sp_in_og, list_seqs_in, lca_dup, sp_outliers, inparalogs_rate, species_overlap]
+                add_entry_to_ogs_info(ogs_info, values)
+
+                
+                
+        #if both root child's are monophyletic OG, then there are not paraphyletic OG at cell org level 
+        if t.children[0].props.get('monophyletic_og') == 'True' and t.children[1].props.get('monophyletic_og') == 'True':
+            pass
         else:
+            para_ogs_root = dict()
+    
             # If root is Duplication, then search in each child for paraphyletic OGs independently
             if t.props.get('evoltype_2') == 'D':
                 for ch in t.children:
@@ -358,7 +330,6 @@ def root_ogs(t, taxonomy_db, count, c, clean_name_tree):
                         elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
                             sci_name_taxa = lca_ch
                         
-
                         all_mems = ch.props.get('leaves_in', set())
                         mem2remove = set()
                         nodes2ckech = set(ch.search_nodes(monophyletic_og='True', lca_dup=lca_ch))
@@ -376,26 +347,63 @@ def root_ogs(t, taxonomy_db, count, c, clean_name_tree):
             
             # If root is no Duplication, then search for one paraphyletic OGs 
             elif t.props.get('evoltype_2') != 'D':
-                    all_mems = t.props.get('leaves_in', set())
-                    mem2remove = set()
-                    nodes2ckech = set(t.search_nodes(monophyletic_og='True', lca_dup=lca_tree))
-                    nodes2ckech.update(t.search_nodes(evoltype_2='D', lca_node=lca_tree))
-                    for n_ in nodes2ckech:
-                        mem2remove.update(n_.props.get('leaves_in'))
-                    diff = all_mems.difference(mem2remove)
-                    if  len(diff)>1:
-                            name = clean_name_tree+'@para_OG_'+str(c)
-                            c+=1
-                            t.add_prop('paraphyletic_og', 'True')
-                            t.add_prop('pog_name', name)
-                            
-                            para_ogs_root[name] = [t.name, str(lca_tree), (list(diff))]
+                
+                all_mems = t.props.get('leaves_in', set())
+                mem2remove = set()
+                nodes2ckech = set(t.search_nodes(monophyletic_og='True', lca_dup=lca_tree))
+                nodes2ckech.update(t.search_nodes(evoltype_2='D', lca_node=lca_tree))
+                for n_ in nodes2ckech:
+                    mem2remove.update(n_.props.get('leaves_in'))
+                diff = all_mems.difference(mem2remove)
+                if  len(diff)>1 and len(nodes2ckech)>0:
+                        name = clean_name_tree+'@para_OG_'+str(c)
+                        c+=1
+                        t.add_prop('paraphyletic_og', 'True')
+                        t.add_prop('pog_name', name)
+                        
+                        para_ogs_root[name] = [t.name, str(lca_tree), (list(diff))]
+                
 
-        annot_ogs_in_root, seqs_in_root = annot_paraphyletic_ogs(t, para_ogs_root, taxonomy_db) 
+            seqs_paraog_in_root = annot_paraphyletic_ogs(t, para_ogs_root, taxonomy_db, ogs_info) 
+            
     
-    return annot_ogs_in_root, seqs_in_root
+    
+    else:
+        list_seqs_in = t.props.get('leaves_in')
+        seqs_in_root.update(list_seqs_in)
 
 
+        for taxa in fromluca2lcatree:
+            if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+                sci_name_taxa =  taxonomy_db.get_taxid_translator([taxa])[int(taxa)]
+            elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
+                sci_name_taxa = taxa
+            
+            count +=1
+            og_name = clean_name_tree+'@mono_OG_'+str(count)
+
+            if taxa != lca_tree:
+                og_name = og_name+'*'
+            
+            sp_in_og = t.props.get('sp_in')
+            lca_dup = '-'
+            sp_outliers = t.props.get('sp_out', '-')
+            len_sp_outliers = len(sp_outliers)
+            if len_sp_outliers == 0:
+                sp_outliers = '-'
+            inparalogs_rate = t.props.get('inparalogs_rate')
+            species_overlap = t.props.get('so_score')
+
+
+            values = [og_name, taxa, sci_name_taxa, t.name, sp_in_og, list_seqs_in, lca_dup, sp_outliers, inparalogs_rate, species_overlap]
+            add_entry_to_ogs_info(ogs_info, values)
+                
+    return  seqs_in_root
+
+
+
+ 
+                          
 
 def hierarchy_ogs(t, ogs_info):
 

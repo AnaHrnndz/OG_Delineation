@@ -90,7 +90,7 @@ def run_hmm_mapper(path2raw, tmp_path):
 
 
 
-def annot_treeprofiler(t, path2raw, path2main_table, path2pfam_table, tmp_path ):
+def annot_treeprofiler(t, aln, path2main_table, path2pfam_table, tmp_path ):
 
 
     t, all_props = utils.run_clean_properties(t)
@@ -99,7 +99,7 @@ def annot_treeprofiler(t, path2raw, path2main_table, path2pfam_table, tmp_path )
     path2tmp_nw = tmp_path+'/tmp_tree.tree_annot.nw'
    
     subprocess.run(("treeprofiler annotate \
-                    -t %s  -o %s --alignment %s --emapper-pfam %s --emapper-annotations %s" %(path2tmp_nw, tmp_path , path2raw, path2pfam_table, path2main_table)), shell = True)
+                    -t %s  -o %s --alignment %s --emapper-pfam %s --emapper-annotations %s" %(path2tmp_nw, tmp_path , aln, path2pfam_table, path2main_table)), shell = True)
 
     #Open again the tree:
     path2tree_treprofiler = glob.glob(tmp_path+'/*_annotated.nw')[0]

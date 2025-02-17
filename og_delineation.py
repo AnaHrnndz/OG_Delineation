@@ -21,7 +21,8 @@ import utils
 from tree_setup  import run_setup
 from outliers_scores import run_outliers_and_scores
 from select_duplications import  run_get_main_dups
-from orthologs_groups import get_all_ogs
+#from orthologs_groups import get_all_ogs
+from ortho_groups_v2 import get_all_ogs
 from timer import Timer
 import prepare_outputs
 
