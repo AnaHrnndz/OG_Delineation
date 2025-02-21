@@ -21,8 +21,7 @@ import utils
 from tree_setup  import run_setup
 from outliers_scores import run_outliers_and_scores
 from select_duplications import  run_get_main_dups
-#from orthologs_groups import get_all_ogs
-from ortho_groups_v2 import get_all_ogs
+from orthologs_groups import get_all_ogs
 from timer import Timer
 import prepare_outputs
 
@@ -336,7 +335,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
 
 
     # 5. Get Monophyletic and Paraphyletic OGs
-    t, ogs_info, seqs_in_ogs = get_all_ogs(t, taxonomy_db, clean_name_tree)
+    t, ogs_info, seqs_in_ogs = get_all_ogs(t, taxonomy_db)
 
 
     # 6. Optionally skip get all orthologs pairs
@@ -379,7 +378,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     """
     print(mssg4)
 
-    prepare_outputs.write_ogs_info(ogs_info, name_tree, path_out)
+    prepare_outputs.write_ogs_info(ogs_info, clean_name_tree, path_out)
 
     seq2ogs = prepare_outputs.get_seq2og(ogs_info)
     prepare_outputs.write_seq2ogs(seq2ogs, path_out,  name_tree)

@@ -126,30 +126,31 @@ def clean_string(string):
     return clean_string
 
 
-def check_nodes_up(node):
+# def check_nodes_up(node):
 
-    """
-        Find OGs in upper nodes
-    """
+    # """
+        # Find OGs in upper nodes
+    # """
 
-    ogs_up = set()
-    dups_up = list()
+    # ogs_up = set()
+    # dups_up = list()
+    # ogs_node_names = list()
     
-    while node.up:
-        if node.up.props.get('monophyletic_og'):
+    # while node.up:
+        # if node.up.props.get('monophyletic_og'):
            
-            if not node.up.props.get('is_root'):
-                ogs_up.add(node.up.props.get('mog_name'))
-                dups_up.append(node.up.up.props.get('name'))
-            else:
-                pass
-                #ogs_up.add('-')
-                #ogs_up.add(node.up.props.get('mog_name', '-'))
-        node = node.up
+            # if not node.up.props.get('is_root'):
+                # ogs_up.add(node.up.props.get('og_name'))
+                # dups_up.append(node.up.up.props.get('name'))
+                # ogs_node_names.append(node.up.name)
+            # else:
+                # pass
+                # #ogs_up.add('-')
+                # #ogs_up.add(node.up.props.get('mog_name', '-'))
+        # node = node.up
 
     
-
-    return ogs_up, dups_up
+    # return ogs_node_names, ogs_up, dups_up
 
 
 def remove_problematic_characters(name):
@@ -174,7 +175,51 @@ def run_write_post_tree(t, name_tree, path_out, all_props):
 
 
 def write_tree_for_minvar_rootin(t, tmp_path):
+
     input_tree_minvar = tmp_path+'input_tree_minvar.nw'
     t.write(outfile=input_tree_minvar, format_root_node = True)
 
     return input_tree_minvar
+
+
+
+def get_sci_name(taxonomy_db, taxa):
+
+    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+        sci_name_taxa =  taxonomy_db.get_taxid_translator([taxa])[int(taxa)]
+    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
+        sci_name_taxa = taxa
+
+    return sci_name_taxa
+
+
+def get_lineage(taxonomy_db, taxid):
+    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+        lin = taxonomy_db.get_lineage(taxid)
+            
+    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
+        if lca_tree != 'r_root':
+            lin =  taxonomy_db.get_name_lineage([taxid])[0][taxid]
+
+    return lin
+
+
+def get_rank(taxonomy_db, taxid):
+    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+        rank = clean_string(taxonomy_db.get_rank([taxid])[taxid])
+
+    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+        rank = get_gtdb_rank(taxid)
+
+    return rank
+
+
+def get_lca_node(taxonomy_db, taxid):
+    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+        lca_node_name = taxonomy_db.get_taxid_translator([taxid])[taxid]
+
+    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+        lca_node_name = lca_node
+
+
+    return lca_node_name

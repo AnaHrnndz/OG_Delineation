@@ -47,22 +47,23 @@ def write_seq2ogs(seq2ogs, path, name_tree):
 
 
 
-def write_ogs_info(ogs_info, name_tree, path):
+def write_ogs_info(ogs_info, clean_name_tree, path):
 
-    name_fam = name_tree.split('.',1)[0]
-    name_out =  path+'/'+name_fam+'.ogs_info.tsv'
+    
+    name_out =  path+'/'+clean_name_tree+'.ogs_info.tsv'
 
     with open(name_out, "w",  newline='') as myfile:
         w = csv.writer(myfile, delimiter='\t')
-        w.writerow(('#OG_name', 'TaxoLevel', 'SciName_TaxoLevel', 'AssocNode',  'NumSP', 'OG_down', 'OG_up', 
-        'NumSeqs', 'NumRecoverySeqs', 'Lca_Dup', 'Species_Outliers', 'Num_SP_Outliers', 'Inparalogs_Rate', 'SP_overlap_dup',
+        w.writerow(('#OG_name', 'Lca_Dup','TaxoLevel', 'SciName_TaxoLevel', 'AssocNode',  'NumSP', 'OG_down', 'OG_up', 
+        'NumSeqs', 'NumRecoverySeqs',  'Species_Outliers', 'Num_SP_Outliers', 'Inparalogs_Rate', 'SP_overlap_dup',
         'Seqs', 'RecoverySeqs'))
 
         for og_name in ogs_info.keys():
-
-            ogs_down = '|'.join(list(ogs_info[og_name]['OG_down']))
-            ogs_up = '|'.join(list(ogs_info[og_name]['OG_up']))
-            sp_outliers = '|'.join(ogs_info[og_name]['Species_Outliers'])
+            
+            og_name_extend = clean_name_tree+'@'+og_name
+            ogs_down = ','.join(list(ogs_info[og_name]['OG_down']))
+            ogs_up = ','.join(list(ogs_info[og_name]['OG_up']))
+            sp_outliers = ','.join(ogs_info[og_name]['Species_Outliers'])
             seqs = ','.join(ogs_info[og_name]['Mems'])
             if len(ogs_info[og_name]['RecoverySeqs']) == 0:
                 rec_seqs = '-'
@@ -70,7 +71,8 @@ def write_ogs_info(ogs_info, name_tree, path):
                 rec_seqs = ','.join(ogs_info[og_name]['RecoverySeqs'])
             
             w.writerow((
-                og_name,    #1
+                og_name_extend,    #1
+                ogs_info[og_name]['Lca_Dup'],
                 ogs_info[og_name]['TaxoLevel'], #2
                 ogs_info[og_name]['SciName_TaxoLevel'], #3
                 ogs_info[og_name]['AssocNode'],   #4
@@ -79,7 +81,6 @@ def write_ogs_info(ogs_info, name_tree, path):
                 ogs_up ,  #7
                 ogs_info[og_name]['NumMems'], #8
                 ogs_info[og_name]['NumRecoverySeqs'], #9
-                ogs_info[og_name]['Lca_Dup'], #10
                 sp_outliers, #11
                 ogs_info[og_name]['Num_SP_Outliers'], #12
                 ogs_info[og_name]['Inparalogs_Rate'], #13

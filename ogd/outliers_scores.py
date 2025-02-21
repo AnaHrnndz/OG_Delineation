@@ -57,8 +57,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             leaves_out = set()
             sp_in = list()
             leaves_in = set()
-            #leaves_in_nodes = set()
-
+            
             #Add outliers from upper nodes
             if args.inherit_out == 'Yes':
                 sp_out_inherit = add_upper_outliers(n, CONTENT)
@@ -95,8 +94,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
                 else:
                     sp_in.append(str(l.props.get('taxid')))
                     leaves_in.add(l.props.get('name'))
-                    #leaves_in_nodes.add(l)
-
+                    
                     if l.name in ch1_leaf_names:
                         sp_ch1.add(str(l.props.get('taxid')))
                         leaves_ch1.add(l.props.get('name'))
@@ -109,15 +107,13 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             overlaped_spces = set(sp_ch1 & sp_ch2)
 
             if len(overlaped_spces)>0:
-                so_score = float(len(overlaped_spces) / len(set(sp_in)))
+                so_score = round(float(len(overlaped_spces) / len(set(sp_in))),4)
                 n.add_prop('overlaped_species', list(overlaped_spces))
             else:
                 so_score = 0.0
 
 
             #   Update last common ancestor, rank and lineage for the node after detect outliers
-            
-            
             update_taxonomical_props(n, set(sp_in), taxonomy_db)
 
             
@@ -129,7 +125,6 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             n.add_prop('ch1_name', ch1_name)
             n.add_prop('ch2_name', ch2_name)
             n.add_prop('leaves_in', leaves_in)
-            #n.add_prop('leaves_in_nodes', leaves_in_nodes)
             n.add_prop('total_leaves', len(n))
             n.add_prop('len_leaves_in', len(leaves_in))
             n.add_prop('len_leaves_out', len(leaves_out))
@@ -139,10 +134,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             n.add_prop('so_score', so_score)
             n.add_prop('sp_out', list(sp_out))
 
-            # if len(sp_out) == 0:
-                # n.add_prop('sp_out', list())
-            # else:
-                # n.add_prop('sp_out', list(sp_out))
+        
 
 
             #   Load_node_scores add properties: score1, score2 and inpalalogs_rate
@@ -284,10 +276,12 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
     ptax = defaultdict(dict)
     
     for tax, num in sp_per_level_in_node.items():
-        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-            depth_tax = len(taxonomy_db.get_lineage(tax))
-        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
-            depth_tax = len(taxonomy_db.get_name_lineage([tax])[0][tax])
+        
+        depth_tax = len(utils.get_lineage(taxonomy_db, tax))
+        # if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            # depth_tax = len(taxonomy_db.get_lineage(tax))
+        # elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
+            # depth_tax = len(taxonomy_db.get_name_lineage([tax])[0][tax])
 
         perc_tax_in_node = len(num)/len(sp_in_node)
         ptax[depth_tax][tax] = perc_tax_in_node
@@ -318,8 +312,8 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
     else:
         n.add_prop('best_tax', 'NO LEAVES')
 
-    best_tax_lineage =  taxonomy_db.get_lineage(best_tax)
-    
+    best_tax_lineage =  utils.get_lineage(taxonomy_db, best_tax)
+   
 
 
     # For the sp that do not belong to the best_tax level, check if are outliers or not
@@ -328,11 +322,8 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
     sp2remove = set()
 
     for sp in candidates2remove:
-        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-            total_lin =taxonomy_db.get_lineage(sp)
-        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-            total_lin = taxonomy_db.get_name_lineage([sp])[0][sp]
         
+        total_lin = utils.get_lineage(taxonomy_db, sp)
         lin2use = set(total_lin).difference(set(best_tax_lineage))
         
         
@@ -373,14 +364,20 @@ def update_taxonomical_props(n, sp_in, taxonomy_db):
             rank = ['r_root']
 
         else:
-            if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-                rank = utils.clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
-                lin_lca = taxonomy_db.get_lineage(lca_node)
-                lca_node_name = taxonomy_db.get_taxid_translator([lca_node])[lca_node]
-            elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-                rank = utils.get_gtdb_rank(lca_node)
-                lin_lca = taxonomy_db.get_name_lineage([lca_node])[0][lca_node]
-                lca_node_name = lca_node
+
+            rank = utils.get_rank(taxonomy_db, lca_node)
+            lin_lca = utils.get_lineage(taxonomy_db, lca_node)
+            lca_node_name = utils.get_lca_node(taxonomy_db, lca_node)
+            
+            
+            # if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+                # rank = utils.clean_string(taxonomy_db.get_rank([lca_node])[lca_node])
+                # lin_lca = taxonomy_db.get_lineage(lca_node)
+                # lca_node_name = taxonomy_db.get_taxid_translator([lca_node])[lca_node]
+            # elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+                # rank = utils.get_gtdb_rank(lca_node)
+                # lin_lca = taxonomy_db.get_name_lineage([lca_node])[0][lca_node]
+                # lca_node_name = lca_node
 
         n.add_prop('lineage', lin_lca)
         n.add_prop('taxid', lca_node)
@@ -409,10 +406,13 @@ def get_lca_node(sp_list, taxonomy_db):
     nspecies = 0
     for sp in sp_list:
         nspecies += 1
-        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-            lineages.update(taxonomy_db.get_lineage(sp))
-        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-            lineages.update(taxonomy_db.get_name_lineage([sp])[0][sp])
+
+        lineages.update(utils.get_lineage(taxonomy_db, sp))
+
+        # if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            # lineages.update(taxonomy_db.get_lineage(sp))
+        # elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            # lineages.update(taxonomy_db.get_name_lineage([sp])[0][sp])
 
     lca = [l for l, count in lineages.items() if count == nspecies]
     
@@ -474,30 +474,35 @@ def best_lin_lost(expected_sp, found_sp, taxonomy_db):
 
     sp_lost_per_level = defaultdict(set)
     for sp in diff_sp:
-        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-            lin2use =taxonomy_db.get_lineage(sp)
-        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-            lin2use = taxonomy_db.get_name_lineage([sp])[0][sp]
+
+        lin2use = utils.get_lineage(taxonomy_db, sp)
+        # if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            # lin2use =taxonomy_db.get_lineage(sp)
+        # elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            # lin2use = taxonomy_db.get_name_lineage([sp])[0][sp]
         
         for tax in lin2use:
             sp_lost_per_level[tax].add(sp)
 
     sp_exp_per_level = defaultdict(set)
     for sp in expected_sp:
-        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-            lin2use =taxonomy_db.get_lineage(sp)
-        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-            lin2use = taxonomy_db.get_name_lineage([sp])[0][sp]
+
+        lin2use = utils.get_lineage(taxonomy_db, sp)
+        # if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            # lin2use =taxonomy_db.get_lineage(sp)
+        # elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            # lin2use = taxonomy_db.get_name_lineage([sp])[0][sp]
         
         for tax in lin2use:
             sp_exp_per_level[tax].add(sp)
 
     ptax = defaultdict(dict)
     for tax, num in sp_lost_per_level.items():
-        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-            depth_tax = len(taxonomy_db.get_lineage(sp))
-        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-            depth_tax = len(taxonomy_db.get_name_lineage([sp])[0][sp])
+        depth_tax = len(utils.get_lineage(taxonomy_db, sp))
+        # if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            # depth_tax = len(taxonomy_db.get_lineage(sp))
+        # elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            # depth_tax = len(taxonomy_db.get_name_lineage([sp])[0][sp])
         
         perc_tax_in_node = len(num)/len(sp_exp_per_level[tax]) 
         ptax[depth_tax][tax] = perc_tax_in_node

@@ -143,7 +143,6 @@ def add_taxomical_annotation(t, taxonomy_db):
 
     taxonomy_db.annotate_tree(t,  taxid_attr="species") 
         
-        
     return t
 
 

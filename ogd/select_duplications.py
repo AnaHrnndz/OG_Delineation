@@ -140,10 +140,13 @@ def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
 
         
         #if node.props.get('lca_node') != 'r_root':
-        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-            target_node.add_prop('dup_lineage', list(taxonomy_db.get_lineage(node.props.get('lca_node'))))
-        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-            target_node.add_prop('dup_lineage', list(taxonomy_db.get_name_lineage([node.props.get('lca_node')])[0][node.props.get('lca_node')]))
+
+        dup_lin = utils.get_lineage(taxonomy_db, node.props.get('lca_node'))
+        target_node.add_prop('dup_lineage', dup_lin)
+        # if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+            # target_node.add_prop('dup_lineage', list(taxonomy_db.get_lineage(node.props.get('lca_node'))))
+        # elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            # target_node.add_prop('dup_lineage', list(taxonomy_db.get_name_lineage([node.props.get('lca_node')])[0][node.props.get('lca_node')]))
         # else:
             # target_node.add_prop('dup_lineage', ['r_root'])
 
