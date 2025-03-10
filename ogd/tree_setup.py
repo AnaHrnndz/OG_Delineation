@@ -119,7 +119,7 @@ def run_minvar(t, path_out, sp_delimitator):
     stdout_file = open(tmp_path+'minvar.stdout', 'w')
     stderr_file = open(tmp_path+'minvar.stderr', 'w')
 
-    subprocess.run(("FastRoot.py -i %s -o %s" \
+    subprocess.run(("python3  $(which FastRoot.py) -i %s -o %s" \
         %(path2tree, path2tmptree)), shell = True, stdout = stdout_file, stderr= stderr_file)
     
     stdout_file.close()

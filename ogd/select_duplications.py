@@ -99,7 +99,7 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
     elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
         lca_root = (t.props.get('lca_node'))
 
-    #if len(list(t.search_nodes(evoltype_2='D', lca_node=lca_root))) == 0:
+    
     if len(list(t.search_nodes(monophyletic_og='True', lca_node=lca_root))) == 0:
         t.add_prop('monophyletic_og', 'True')
 
@@ -138,18 +138,9 @@ def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
         target_node.add_prop('lca_dup', node.props.get('lca_node'))
         target_node.add_prop('so_score_dup', node.props.get('so_score'))
 
-        
-        #if node.props.get('lca_node') != 'r_root':
-
         dup_lin = utils.get_lineage(taxonomy_db, node.props.get('lca_node'))
         target_node.add_prop('dup_lineage', dup_lin)
-        # if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-            # target_node.add_prop('dup_lineage', list(taxonomy_db.get_lineage(node.props.get('lca_node'))))
-        # elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-            # target_node.add_prop('dup_lineage', list(taxonomy_db.get_name_lineage([node.props.get('lca_node')])[0][node.props.get('lca_node')]))
-        # else:
-            # target_node.add_prop('dup_lineage', ['r_root'])
-
+        
         target_node.add_prop('dup_node_name', node.props.get('name'))
 
         taxid_dups_og.add(node.props.get('lca_node'))

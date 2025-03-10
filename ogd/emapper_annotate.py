@@ -12,7 +12,7 @@ EMAPPER ANNOTATION
 """
 
 
-def annotate_with_emapper(t, alg, tmp_path):
+def annotate_with_emapper(t, alg, tmp_path, data_path):
     
     """"
         Add to the leaves of tree t the information coming from emapper
@@ -21,16 +21,13 @@ def annotate_with_emapper(t, alg, tmp_path):
    
     path2raw = alg2rawfasta(alg, tmp_path)
 
-    path2main_table = run_emapper(path2raw, tmp_path)
-    path2pfam_table = run_hmm_mapper(path2raw, tmp_path)
+    path2main_table = run_emapper(path2raw, tmp_path, data_path)
+    path2pfam_table = run_hmm_mapper(path2raw, tmp_path, data_path)
 
-    print('**********')
 
     t = annot_treeprofiler(t, alg, path2main_table, path2pfam_table, tmp_path)
 
-    # t = annot_tree_pfam_table(t, path2pfam_table, alg)
-
-    # t = annot_tree_main_table(t, path2main_table)
+    
 
     return t
 
@@ -51,7 +48,7 @@ def alg2rawfasta(alg, tmp_path):
     return path2raw
 
 
-def run_emapper(path2raw, tmp_path):
+def run_emapper(path2raw, tmp_path, data_path):
 
     """
         Run eggnog-mapper:
@@ -62,9 +59,10 @@ def run_emapper(path2raw, tmp_path):
 
     """
 
-    subprocess.run(("python /data/soft/eggnog-mapper_2.1.12/eggnog-mapper/emapper.py --sensmode fast  \
-        --data_dir /data/soft/eggnog-mapper_2.1.12/eggnog-mapper/data  \
-        -i %s -o %s --output_dir %s" %(path2raw, 'result_emapper', tmp_path)), shell = True)
+    #subprocess.run(("python /data/soft/eggnog-mapper_2.1.12/eggnog-mapper/emapper.py --sensmode fast 
+    subprocess.run(("emapper.py --sensmode fast  \
+        --data_dir %s/emapper  \
+        -i %s -o %s --output_dir %s" %(data_path, path2raw, 'result_emapper', tmp_path)), shell = True)
 
 
     path2main_table = tmp_path+'/result_emapper.emapper.annotations'
@@ -72,17 +70,18 @@ def run_emapper(path2raw, tmp_path):
 
 
 
-def run_hmm_mapper(path2raw, tmp_path):
+def run_hmm_mapper(path2raw, tmp_path, data_path):
 
     """
         Pfam annotation with hmm_mapper from eggnog-mapper scripts
     """
 
-    subprocess.run(("python /data/soft/eggnog-mapper_2.1.12/eggnog-mapper/hmm_mapper.py \
+    #subprocess.run(("python /data/soft/eggnog-mapper_2.1.12/eggnog-mapper/hmm_mapper.py \
+    subprocess.run(("hmm_mapper.py \
         --cut_ga --clean_overlaps clans --usemem --num_servers 1 --num_workers 4 --cpu 4 \
-        --dbtype hmmdb  -d /data/soft/eggnog-mapper_2.1.9/data/pfam/Pfam-A.hmm \
+        --dbtype hmmdb  -d %s/pfam/Pfam-A.hmm \
         --hmm_maxhits 0 --hmm_maxseqlen 60000 \
-        --qtype seq -i %s -o %s --output_dir %s" %(path2raw, 'result_emapper', tmp_path)), shell = True)
+        --qtype seq -i %s -o %s --output_dir %s" %(data_path, path2raw, 'result_emapper', tmp_path)), shell = True)
 
     path2pfam_table = tmp_path+'/result_emapper.emapper.hmm_hits'
 

@@ -1,45 +1,36 @@
-Script to detect Orthologous Gruops in trees based on duplications events
+# Orthologous Group Delineation
 
+Orthologous Groups Delineation (OGD) algorithm attempt to identify orthologous groups in trees based on duplication events.
 
 MAIN FUNCTION, run all steps of the analysis:
-    1.  Load files needed for the analysis.
-            Tree, taxonomy, reference tree (species tree), taxonomy counter
-    2.  Tree setup (Pre-analysis). Run some basic analysis:
-            - Resolve polytomies
-            - Rooting;Midpoint or MinVar
-            - NCBI annotation
-            - Save original species and original leaf names
-    3. Outliers and Dups score:
-            - Long branches
-            - Taxonomical outliers
-            - Species overlap
-            - Score1
-            - Score2
-            - Inpalalogs rate
-            - Duplication score
-            - Linage lost
-    4. Detect HQ-Duplications:
-            Select high quality duplication that create Basal Orthologs Groups (OGs)
-    5. Get OGs for all taxonomical levels
-    6. Add info about Basal-OGs up and down:
-            For each Basal-OG detect upper and below Basal-OGs (Basal-OGs have nested structure)
-    7. Annotate Basal-OGs with taxonomy, etc
-    8. Write a table with the results for the Basal-OGs
-    9. Optionally modify Basal-OGs by recovering sequences (see RECOVERY PIPELINE)
-    10. Optionally add annotations from emapper (see EMAPPER ANNOTATION)
-    11. Optionally  Get all orthologs pairs
-    12. Annotate root:
-            Root is a special node that has to be annotated diffent
-    13. Flag seqs out OGs
-            If some seqs still out at least one Basal-OGs, add a flag for visualization
-    14. Write output files:
-            - annot_tree
-            - seq2ogs
+
+        1.  Load files needed for the analysis.  
+                Tree, taxonomy, reference tree (species tree), taxonomy counter  
+        2.  Tree setup (Pre-analysis). Run some basic analysis:   
+                - Resolve polytomies  
+                - Rooting;Midpoint or MinVar  
+                - NCBI annotation  
+                - Save original species and original leaf names  
+        3. Outliers and Dups score:  
+                - Detect long branches  
+                - Detect taxonomical outliers  
+                - Caldulate: Species overlap, Score1, Score2, Inpalalogs rate, Duplication score and Linage lost  
+        4. Detect HQ-Duplications:  
+                Select high quality duplication that create Basal Orthologs Groups (OGs)  
+        5. Get OGs
+        6. Optionally skip get all orthologs pairs
+        7. Optionally modify OGs by recovering sequences (see RECOVERY PIPELINE)
+        8. Optionally add annotations from emapper  (see EMAPPER ANNOTATION)
+                8.1 Run emapper and annotate with treeprofiler
+                8.2 Only annotate with treeprofiler
+        9. Annotate root 
+        10. Flag seqs out OGs
+        11. Write output files
 
 
+RECOVERY PIPELINE:
 
-RECOVERY PIPELINE
-    - Recovery Pipeline: If user provide a alignment file AND some sequences (members) are not included in at least one Core-OGs
+    If user provide a alignment file AND some sequences (members) are not included in at least one Core-OGs
             1. Write a fasta file with all raw seqs left out of the Core-OGs and for each Core-OGs write a fasta file
                 1.1 Regular mode: Re-aling sequences
                 1.2 Fast mode: use aligned sequnces
@@ -53,5 +44,6 @@ RECOVERY PIPELINE
             9. write_best_match
             10. Tar the folder with all the fasta file, HMMs, etc
 
-EMAPPER ANNOTATION
-    - Eggnog-Mapper: annotate tree sequences with eggnog-mapper, user needs to provide alignment file
+EMAPPER ANNOTATION:
+
+    Annotate tree sequences with eggnog-mapper, user needs to provide alignment file

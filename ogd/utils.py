@@ -1,5 +1,6 @@
 import re
 from ete4 import PhyloTree
+from collections import defaultdict
 
 def parse_taxid(node):
 
@@ -126,31 +127,6 @@ def clean_string(string):
     return clean_string
 
 
-# def check_nodes_up(node):
-
-    # """
-        # Find OGs in upper nodes
-    # """
-
-    # ogs_up = set()
-    # dups_up = list()
-    # ogs_node_names = list()
-    
-    # while node.up:
-        # if node.up.props.get('monophyletic_og'):
-           
-            # if not node.up.props.get('is_root'):
-                # ogs_up.add(node.up.props.get('og_name'))
-                # dups_up.append(node.up.up.props.get('name'))
-                # ogs_node_names.append(node.up.name)
-            # else:
-                # pass
-                # #ogs_up.add('-')
-                # #ogs_up.add(node.up.props.get('mog_name', '-'))
-        # node = node.up
-
-    
-    # return ogs_node_names, ogs_up, dups_up
 
 
 def remove_problematic_characters(name):
@@ -223,3 +199,16 @@ def get_lca_node(taxonomy_db, taxid):
 
 
     return lca_node_name
+
+
+def update_sp_per_level_in_node(sp_per_level_in_node, taxonomy_db, l):
+
+    
+    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+        for tax in l.props.get('lineage').split('|'):
+            sp_per_level_in_node[tax].add(str(l.props.get('taxid')))
+    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
+        for tax in l.props.get('named_lineage').split('|'):
+            sp_per_level_in_node[tax].add(str(l.props.get('taxid')))
+
+    

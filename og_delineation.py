@@ -31,6 +31,7 @@ cwd =  str(pathlib.Path(__file__).parent.resolve())
 
 bin_path =  cwd+'/bin'
 data_path = cwd+'/data'
+
 sys.path.append(bin_path)
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -297,13 +298,13 @@ def run_app(tree, abs_path, name_tree, path_out, args):
             Detect long branches, taxonomical outliers, calculate species overlap, score1, score2 and inpalalogs_rate
         4. Detect HQ-Duplications:
             Select high quality duplication that create Monophyletic Orthologs Groups (OGs)
-        5. Get Monophyletic and Paraphyletic OGs
+        5. Get OGs
         6. Optionally skip get all orthologs pairs
-        7. Optionally modify Monophyletic-OGs by recovering sequences (see RECOVERY PIPELINE)
+        7. Optionally modify OGs by recovering sequences (see RECOVERY PIPELINE)
         8. Optionally add annotations from emapper  (see EMAPPER ANNOTATION)
             8.1 Run emapper and annotate with treeprofiler
             8.2 Only annotate with treeprofiler
-        9. Annotate root & messy_ogs
+        9. Annotate root
         10. Flag seqs out OGs
         11. Write output files
     """
@@ -334,7 +335,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     t,  taxid_dups_og  = run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args)
 
 
-    # 5. Get Monophyletic and Paraphyletic OGs
+    # 5. Get OGs
     t, ogs_info, seqs_in_ogs = get_all_ogs(t, taxonomy_db)
 
 
@@ -356,7 +357,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     # 8. Optionally add annotations from emapper
         # 8.1 Run emapper and annotate with treeprofiler
     if args.run_emapper:
-        t = annotate_with_emapper(t, args.alg, tmp_path)
+        t = annotate_with_emapper(t, args.alg, tmp_path, data_path)
         
         # 8.2 Only annotate with treeprofiler
     if args.path2emapper_main:
@@ -395,14 +396,33 @@ def run_app(tree, abs_path, name_tree, path_out, args):
 def get_args():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--tree', dest = 'tree', required = True)
-    parser.add_argument('--raw_alg', dest = 'alg')
-    parser.add_argument('--output_path', dest = 'out_path', required= True)
+
+    parser.add_argument('-v', '--version', action='store_true',
+                        help="show version and exit.")
+
+    parser.add_argument('--tree', dest = 'tree', required = True,
+                    help="Input tree" )
+
+    parser.add_argument('--raw_alg', dest = 'alg', 
+                    help="Input alignment. Needed for run emapper and recovery modules")
+
+    parser.add_argument('--output_path', dest = 'out_path', required= True,
+                    help="Output path")
     
-    parser.add_argument('--sp_ovlap_all', default = 0.01, dest = 'so_all', type = float)
-    parser.add_argument('--sp_ovlap_euk', dest = 'so_euk', type = float)
-    parser.add_argument('--sp_ovlap_bact', dest = 'so_bact' ,  type = float)
-    parser.add_argument('--sp_ovlap_arq', dest = 'so_arq', type = float)
+    parser.add_argument('--sp_ovlap_all', default = 0.01, dest = 'so_all', type = float,
+                    help='Species overlap treshold used for all nodes. ' )
+
+    parser.add_argument('--sp_ovlap_euk', dest = 'so_euk', type = float, 
+                    help="Species overlap treshold used for internal nodes that contain only eukariotas. "
+                    "For all other internal nodes, the sp_ovlap_all threshold is applied.")
+
+    parser.add_argument('--sp_ovlap_bact', dest = 'so_bact' ,  type = float, 
+                        help="Species overlap treshold used for internal nodes that contain only bacterias. "
+                        "For all other internal nodes, the sp_ovlap_all threshold is applied.")
+
+    parser.add_argument('--sp_ovlap_arq', dest = 'so_arq', type = float,
+                        help="Species overlap treshold used for internal nodes that contain only archeas. "
+                        "For all other internal nodes, the sp_ovlap_all threshold is applied.")
 
     parser.add_argument('--lineage_threshold', dest = 'lineage_thr' , default = 0.05, type = float)
     parser.add_argument('--best_taxa_threshold', dest = 'best_tax_thr' , default = 0.9, type = float)

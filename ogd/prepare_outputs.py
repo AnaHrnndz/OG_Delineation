@@ -33,7 +33,7 @@ def write_seq2ogs(seq2ogs, path, name_tree):
     seq2ogs_out = open(path+'/'+name_fam+'.seq2ogs.tsv', 'w')
     for seq, ogs in seq2ogs.items():
         seq2og_list.append({seq:list(ogs)})
-        seq2ogs_out.write(seq+'\t'+'|'.join(list(ogs))+'\n')
+        seq2ogs_out.write(seq+'\t'+','.join(list(ogs))+'\n')
 
     seq2ogs_out.close()
 
