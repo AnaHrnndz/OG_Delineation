@@ -12,18 +12,16 @@ import re
 import csv
 import pathlib
 
-cwd =  str(pathlib.Path(__file__).parent.resolve())
-sys.path.append(cwd+'/ogd')
-from emapper_annotate import annotate_with_emapper, annot_treeprofiler
-from recovery import recover_sequences
-import  pairs
-import utils
-from tree_setup  import run_setup
-from outliers_scores import run_outliers_and_scores
-from select_duplications import  run_get_main_dups
-from orthologs_groups import get_all_ogs
-from timer import Timer
-import prepare_outputs
+from ogd.emapper_annotate import annotate_with_emapper, annot_treeprofiler
+from ogd.recovery import recover_sequences
+import  ogd.pairs as pairs
+import ogd.utils as utils
+from ogd.tree_setup  import run_setup
+from ogd.outliers_scores import run_outliers_and_scores
+from ogd.select_duplications import  run_get_main_dups
+from ogd.orthologs_groups import get_all_ogs
+import ogd.prepare_outputs as prepare_outputs
+from ogd.timer import Timer
 
 #from messy_ogs import get_messy_groups, annotate_messy_og
 

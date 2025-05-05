@@ -3,7 +3,7 @@ import subprocess
 from collections import defaultdict
 from ete4 import SeqGroup, PhyloTree
 import glob
-import utils
+import ogd.utils
 
 
 """

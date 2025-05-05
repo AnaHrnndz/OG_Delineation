@@ -1,7 +1,7 @@
 from ete4 import PhyloTree
 import numpy as np
 from collections import defaultdict, Counter, OrderedDict
-import utils
+import ogd.utils as utils
 
 
 

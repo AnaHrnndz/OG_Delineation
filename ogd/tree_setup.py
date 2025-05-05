@@ -1,6 +1,6 @@
 import subprocess
 from ete4 import  PhyloTree, GTDBTaxa
-import utils
+import ogd.utils as utils
 import re
 
 ## 2. Preanalysis - Tree setup  ##
