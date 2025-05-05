@@ -51,7 +51,7 @@ def create_tmp(path_out):
         return path 
     
     except OSError as error: 
-        path = tempfile.mkdtemp(dir="/tmp_dir")
+        path = tempfile.mkdtemp(dir="/tmp")
         return path 
         
     else: 
