@@ -11,6 +11,7 @@ import warnings
 import re
 import csv
 import pathlib
+import tempfile
 
 from ogd.emapper_annotate import annotate_with_emapper, annot_treeprofiler
 from ogd.recovery import recover_sequences
@@ -47,11 +48,16 @@ def create_tmp(path_out):
  
     try: 
         os.makedirs(path, exist_ok = True) 
-        
+        return path 
+    
     except OSError as error: 
+        path = tempfile.mkdtemp(dir="/tmp_dir")
+        return path 
+        
+    else: 
         print("Directory '%s' can not be created" % path)
 
-    return path 
+    
 
 
 def load_tree_local(tree=None, taxonomy = None, sp_delimitator = None):
