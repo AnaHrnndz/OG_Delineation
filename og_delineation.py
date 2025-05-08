@@ -44,10 +44,14 @@ def create_tmp(path_out):
         Create the tmp dir 
 
     """
-    results_abs_path = os.path.abspath(path_out)
-    tmp_path = tempfile.mkdtemp(dir=results_abs_path)
+    try:
+        results_abs_path = os.path.abspath(path_out)
+        tmp_path = tempfile.mkdtemp(dir=results_abs_path)
 
-    return tmp_path
+        return tmp_path+'/'
+    except:
+        tmp_path = tempfile.mkdtemp(prefix="ogd_", dir="/tmp")
+        return tmp_path+'/'
     
     #path = os.path.join(path_out, 'tmp_dir') 
   
