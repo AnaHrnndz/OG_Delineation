@@ -7,7 +7,7 @@ import re
 
 chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
-def run_setup(t, name_tree, taxonomy_db, path_out, args):
+def run_setup(t, name_tree, taxonomy_db, path_out, tmp_path, args):
 
 
     """
@@ -27,7 +27,7 @@ def run_setup(t, name_tree, taxonomy_db, path_out, args):
 
     t = check_branch_legth(t)
 
-    t = run_rooting(t, rooting, path_out, sp_delimitator)
+    t = run_rooting(t, rooting, tmp_path, sp_delimitator)
 
     t = add_taxomical_annotation(t, taxonomy_db)
 
@@ -79,7 +79,7 @@ def check_branch_legth(t):
     return t
 
 
-def run_rooting(t, rooting, path_out, sp_delimitator):
+def run_rooting(t, rooting, tmp_path, sp_delimitator):
 
     """
         Tree rooting.
@@ -94,7 +94,7 @@ def run_rooting(t, rooting, path_out, sp_delimitator):
             print('Error in Midpoint')
 
     elif rooting == "MinVar":
-        t = run_minvar(t, path_out, sp_delimitator)
+        t = run_minvar(t, tmp_path, sp_delimitator)
 
     else:
         print('No rooting')
@@ -102,7 +102,7 @@ def run_rooting(t, rooting, path_out, sp_delimitator):
     return t
 
 
-def run_minvar(t, path_out, sp_delimitator):
+def run_minvar(t, tmp_path, sp_delimitator):
 
     """
         With MinVar rooting, you need to :
@@ -111,11 +111,11 @@ def run_minvar(t, path_out, sp_delimitator):
         3. Open it again with PhyloTree
     
     """
-    tmp_path = path_out+'tmp_dir/'
+   
     
     input_tree_minvar = utils.write_tree_for_minvar_rootin(t, tmp_path)
     path2tree = input_tree_minvar
-    path2tmptree = path_out+'tmp_dir/'+'output_minvar_tree.nw'
+    path2tmptree = tmp_path+'output_minvar_tree.nw'
     stdout_file = open(tmp_path+'minvar.stdout', 'w')
     stderr_file = open(tmp_path+'minvar.stderr', 'w')
 

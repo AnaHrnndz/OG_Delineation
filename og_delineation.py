@@ -42,20 +42,29 @@ def create_tmp(path_out):
 
     """
         Create the tmp dir 
+
     """
-    path = os.path.join(path_out, 'tmp_dir') 
+    results_abs_path = os.path.abspath(path_out)
+    tmp_path = tempfile.mkdtemp(dir=results_abs_path)
+
+    return tmp_path
+    
+    #path = os.path.join(path_out, 'tmp_dir') 
   
  
-    try: 
-        os.makedirs(path, exist_ok = True) 
-        return path 
+    # try: 
+        # os.makedirs(path, exist_ok = True) 
+        # return path 
     
-    except OSError as error: 
-        path = tempfile.mkdtemp(dir="/tmp")
-        return path 
+    #except OSError as error: 
+    # try:
+        # print(path_out)
+        # path = tempfile.mkdtemp(dir=path_out, suffix='/tmp_dir')
+        # print(path)
+        # return path 
         
-    else: 
-        print("Directory '%s' can not be created" % path)
+    # except: 
+        # print("Directory '%s' can not be created" % path_out)
 
     
 
@@ -318,6 +327,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     0. Load info"""
     print(mssg)
 
+
     clean_name_tree = utils.remove_problematic_characters(name_tree)
 
     t = load_tree_local(tree = tree, taxonomy = args.taxonomy_type, sp_delimitator = args.sp_delim)
@@ -328,7 +338,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     
 
     # 2. Tree setup (Pre-analysis):  resolve polytomies, rooting, ncbi annotation, etc
-    t_nw , sp_set, total_mems_in_tree, num_total_sp = run_setup(t, name_tree, taxonomy_db, path_out, args)
+    t_nw , sp_set, total_mems_in_tree, num_total_sp = run_setup(t, name_tree, taxonomy_db, path_out, tmp_path, args)
     
 
     # 3. Outliers and Dups score functions

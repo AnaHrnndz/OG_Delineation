@@ -341,7 +341,7 @@ def update_taxonomical_props(n, sp_in, taxonomy_db):
 
             rank = utils.get_rank(taxonomy_db, lca_node)
             lin_lca = utils.get_lineage(taxonomy_db, lca_node)
-            lca_node_name = utils.get_lca_node(taxonomy_db, lca_node)
+            lca_node_name = utils.get_lca_node_name(taxonomy_db, lca_node)
 
         n.add_prop('lineage', lin_lca)
         n.add_prop('taxid', lca_node)

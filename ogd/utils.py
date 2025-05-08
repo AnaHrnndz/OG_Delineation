@@ -190,7 +190,7 @@ def get_rank(taxonomy_db, taxid):
     return rank
 
 
-def get_lca_node(taxonomy_db, taxid):
+def get_lca_node_name(taxonomy_db, taxid):
     if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
         lca_node_name = taxonomy_db.get_taxid_translator([taxid])[taxid]
 
