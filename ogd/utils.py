@@ -150,9 +150,9 @@ def run_write_post_tree(t, name_tree, path_out, all_props):
     return
 
 
-def write_tree_for_minvar_rootin(t, tmp_path):
+def write_tree_for_minvar_rootin(t, tmpdir):
 
-    input_tree_minvar = tmp_path+'input_tree_minvar.nw'
+    input_tree_minvar = tmpdir+'input_tree_minvar.nw'
     t.write(outfile=input_tree_minvar, format_root_node = True)
 
     return input_tree_minvar

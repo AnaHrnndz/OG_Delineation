@@ -41,34 +41,31 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 def create_tmp(path_out):
 
     """
-        Create the tmp dir 
+    Create a temporary directory.
 
+    Tries to create the temporary directory inside the results folder (`path_out`).
+    If it fails (e.g., due to permissions or when running in a container),
+    falls back to creating it in /tmp.
+
+    Args:
+        path_out (str): Path to the desired output directory.
+
+    Returns:
+        str: Full path to the created temporary directory, ending with a slash.
+    
     """
+
     try:
         results_abs_path = os.path.abspath(path_out)
-        tmp_path = tempfile.mkdtemp(dir=results_abs_path)
+        tmpdir = tempfile.mkdtemp(dir=results_abs_path)
 
-        return tmp_path+'/'
-    except:
-        tmp_path = tempfile.mkdtemp(prefix="ogd_", dir="/tmp")
-        return tmp_path+'/'
+    except Exception as e:
+        print(f"Warning: Failed to create tmp dir in '{path_out}', using /tmp instead. Error: {e}")
+        tmpdir = tempfile.mkdtemp(prefix="ogd_", dir="/tmp")
     
-    #path = os.path.join(path_out, 'tmp_dir') 
-  
- 
-    # try: 
-        # os.makedirs(path, exist_ok = True) 
-        # return path 
+    return tmpdir + '/'
     
-    #except OSError as error: 
-    # try:
-        # print(path_out)
-        # path = tempfile.mkdtemp(dir=path_out, suffix='/tmp_dir')
-        # print(path)
-        # return path 
-        
-    # except: 
-        # print("Directory '%s' can not be created" % path_out)
+    
 
     
 
@@ -338,11 +335,11 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     taxonomy_db = load_taxonomy(taxonomy = args.taxonomy_type, user_taxonomy= args.user_taxonomy)
     reftree = load_reftree(rtree = args.reftree, t = t, taxonomy_db = taxonomy_db)
     level2sp_mem = load_taxonomy_counter(reftree=reftree, user_taxonomy_counter = args.user_taxonomy_counter)
-    tmp_path = create_tmp(path_out)
+    tmpdir = create_tmp(path_out)
     
 
     # 2. Tree setup (Pre-analysis):  resolve polytomies, rooting, ncbi annotation, etc
-    t_nw , sp_set, total_mems_in_tree, num_total_sp = run_setup(t, name_tree, taxonomy_db, path_out, tmp_path, args)
+    t_nw , sp_set, total_mems_in_tree, num_total_sp = run_setup(t, name_tree, taxonomy_db, path_out, tmpdir, args)
     
 
     # 3. Outliers and Dups score functions
@@ -375,13 +372,13 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     # 8. Optionally add annotations from emapper
         # 8.1 Run emapper and annotate with treeprofiler
     if args.run_emapper:
-        t = annotate_with_emapper(t, args.alg, tmp_path, data_path)
+        t = annotate_with_emapper(t, args.alg, tmpdir, data_path)
         
         # 8.2 Only annotate with treeprofiler
     if args.path2emapper_main:
         main_table = args.path2emapper_main
         pfam_table = args.path2emapper_pfams
-        t = annot_treeprofiler(t, args.alg, main_table, pfam_table, tmp_path) 
+        t = annot_treeprofiler(t, args.alg, main_table, pfam_table, tmpdir) 
     
 
     # 9. Annotate root 

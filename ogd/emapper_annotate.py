@@ -3,7 +3,7 @@ import subprocess
 from collections import defaultdict
 from ete4 import SeqGroup, PhyloTree
 import glob
-import ogd.utils
+import ogd.utils as utils
 
 
 """
@@ -12,33 +12,33 @@ EMAPPER ANNOTATION
 """
 
 
-def annotate_with_emapper(t, alg, tmp_path, data_path):
+def annotate_with_emapper(t, alg, tmpdir, data_path):
     
     """"
         Add to the leaves of tree t the information coming from emapper
         and return the annotated tree.
     """
    
-    path2raw = alg2rawfasta(alg, tmp_path)
+    path2raw = alg2rawfasta(alg, tmpdir)
 
-    path2main_table = run_emapper(path2raw, tmp_path, data_path)
-    path2pfam_table = run_hmm_mapper(path2raw, tmp_path, data_path)
+    path2main_table = run_emapper(path2raw, tmpdir, data_path)
+    path2pfam_table = run_hmm_mapper(path2raw, tmpdir, data_path)
 
 
-    t = annot_treeprofiler(t, alg, path2main_table, path2pfam_table, tmp_path)
+    t = annot_treeprofiler(t, alg, path2main_table, path2pfam_table, tmpdir)
 
     
 
     return t
 
-def alg2rawfasta(alg, tmp_path):
+def alg2rawfasta(alg, tmpdir):
     
     """
     Remove gaps '-' from alignment to get raw fasta 
     """
 
     fasta = SeqGroup(alg)
-    path2raw = tmp_path+'/total_raw_fasta.faa'
+    path2raw = tmpdir+'total_raw_fasta.faa'
     raw_fasta = open(path2raw, 'w')
     for num, (name, aa, _) in enumerate(fasta):
         clean_aa = aa.replace('-','')
@@ -48,7 +48,7 @@ def alg2rawfasta(alg, tmp_path):
     return path2raw
 
 
-def run_emapper(path2raw, tmp_path, data_path):
+def run_emapper(path2raw, tmpdir, data_path):
 
     """
         Run eggnog-mapper:
@@ -60,17 +60,17 @@ def run_emapper(path2raw, tmp_path, data_path):
     """
 
     #subprocess.run(("python /data/soft/eggnog-mapper_2.1.12/eggnog-mapper/emapper.py --sensmode fast 
-    subprocess.run(("emapper.py --sensmode fast  \
-        --data_dir %s/emapper  \
-        -i %s -o %s --output_dir %s" %(data_path, path2raw, 'result_emapper', tmp_path)), shell = True)
+    subprocess.run(("emapper.py --sensmode fast --cpu 8 \
+        --data_dir %s/emapper --temp_dir %s \
+        -i %s -o %s --output_dir %s" %(data_path, tmpdir, path2raw, 'result_emapper', tmpdir)), shell = True)
 
 
-    path2main_table = tmp_path+'/result_emapper.emapper.annotations'
+    path2main_table = tmpdir+'result_emapper.emapper.annotations'
     return  path2main_table
 
 
 
-def run_hmm_mapper(path2raw, tmp_path, data_path):
+def run_hmm_mapper(path2raw, tmpdir, data_path):
 
     """
         Pfam annotation with hmm_mapper from eggnog-mapper scripts
@@ -81,27 +81,27 @@ def run_hmm_mapper(path2raw, tmp_path, data_path):
         --cut_ga --clean_overlaps clans --usemem --num_servers 1 --num_workers 4 --cpu 4 \
         --dbtype hmmdb  -d %s/pfam/Pfam-A.hmm \
         --hmm_maxhits 0 --hmm_maxseqlen 60000 \
-        --qtype seq -i %s -o %s --output_dir %s" %(data_path, path2raw, 'result_emapper', tmp_path)), shell = True)
+        --qtype seq -i %s -o %s --output_dir %s" %(data_path, path2raw, 'result_emapper', tmpdir)), shell = True)
 
-    path2pfam_table = tmp_path+'/result_emapper.emapper.hmm_hits'
+    path2pfam_table = tmpdir+'result_emapper.emapper.hmm_hits'
 
     return path2pfam_table
 
 
 
-def annot_treeprofiler(t, aln, path2main_table, path2pfam_table, tmp_path ):
+def annot_treeprofiler(t, aln, path2main_table, path2pfam_table, tmpdir ):
 
 
     t, all_props = utils.run_clean_properties(t)
     tmp_nw = 'tmp_tree.nw'
-    utils.run_write_post_tree(t, tmp_nw, tmp_path, all_props)
-    path2tmp_nw = tmp_path+'/tmp_tree.tree_annot.nw'
+    utils.run_write_post_tree(t, tmp_nw, tmpdir, all_props)
+    path2tmp_nw = tmpdir+'tmp_tree.tree_annot.nw'
    
     subprocess.run(("treeprofiler annotate \
-                    -t %s  -o %s --alignment %s --emapper-pfam %s --emapper-annotations %s" %(path2tmp_nw, tmp_path , aln, path2pfam_table, path2main_table)), shell = True)
+                    -t %s  -o %s --alignment %s --emapper-pfam %s --emapper-annotations %s" %(path2tmp_nw, tmpdir , aln, path2pfam_table, path2main_table)), shell = True)
 
     #Open again the tree:
-    path2tree_treprofiler = glob.glob(tmp_path+'/*_annotated.nw')[0]
+    path2tree_treprofiler = glob.glob(tmpdir+'*_annotated.nw')[0]
     
     t = PhyloTree(open(path2tree_treprofiler), parser = 0)
     

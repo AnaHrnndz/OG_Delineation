@@ -7,7 +7,7 @@ import re
 
 chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
-def run_setup(t, name_tree, taxonomy_db, path_out, tmp_path, args):
+def run_setup(t, name_tree, taxonomy_db, path_out, tmpdir, args):
 
 
     """
@@ -27,7 +27,7 @@ def run_setup(t, name_tree, taxonomy_db, path_out, tmp_path, args):
 
     t = check_branch_legth(t)
 
-    t = run_rooting(t, rooting, tmp_path, sp_delimitator)
+    t = run_rooting(t, rooting, tmpdir, sp_delimitator)
 
     t = add_taxomical_annotation(t, taxonomy_db)
 
@@ -79,7 +79,7 @@ def check_branch_legth(t):
     return t
 
 
-def run_rooting(t, rooting, tmp_path, sp_delimitator):
+def run_rooting(t, rooting, tmpdir, sp_delimitator):
 
     """
         Tree rooting.
@@ -94,7 +94,7 @@ def run_rooting(t, rooting, tmp_path, sp_delimitator):
             print('Error in Midpoint')
 
     elif rooting == "MinVar":
-        t = run_minvar(t, tmp_path, sp_delimitator)
+        t = run_minvar(t, tmpdir, sp_delimitator)
 
     else:
         print('No rooting')
@@ -102,7 +102,7 @@ def run_rooting(t, rooting, tmp_path, sp_delimitator):
     return t
 
 
-def run_minvar(t, tmp_path, sp_delimitator):
+def run_minvar(t, tmpdir, sp_delimitator):
 
     """
         With MinVar rooting, you need to :
@@ -113,11 +113,11 @@ def run_minvar(t, tmp_path, sp_delimitator):
     """
    
     
-    input_tree_minvar = utils.write_tree_for_minvar_rootin(t, tmp_path)
+    input_tree_minvar = utils.write_tree_for_minvar_rootin(t, tmpdir)
     path2tree = input_tree_minvar
-    path2tmptree = tmp_path+'output_minvar_tree.nw'
-    stdout_file = open(tmp_path+'minvar.stdout', 'w')
-    stderr_file = open(tmp_path+'minvar.stderr', 'w')
+    path2tmptree = tmpdir+'output_minvar_tree.nw'
+    stdout_file = open(tmpdir+'minvar.stdout', 'w')
+    stderr_file = open(tmpdir+'minvar.stderr', 'w')
 
     subprocess.run(("python3  $(which FastRoot.py) -i %s -o %s" \
         %(path2tree, path2tmptree)), shell = True, stdout = stdout_file, stderr= stderr_file)
