@@ -29,7 +29,7 @@ from ogd.timer import Timer
 cwd =  str(pathlib.Path(__file__).parent.resolve())
 
 bin_path =  cwd+'/bin'
-data_path = cwd+'/data'
+
 
 sys.path.append(bin_path)
 
@@ -372,7 +372,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     # 8. Optionally add annotations from emapper
         # 8.1 Run emapper and annotate with treeprofiler
     if args.run_emapper:
-        t = annotate_with_emapper(t, args.alg, tmpdir, data_path)
+        t = annotate_with_emapper(t, args.alg, tmpdir, args.emapper_data)
         
         # 8.2 Only annotate with treeprofiler
     if args.path2emapper_main:
@@ -449,6 +449,7 @@ def get_args():
     parser.add_argument('--user_taxonomy_counter', default=None)
     parser.add_argument('--reftree', default=None)
     parser.add_argument('--run_emapper', action='store_true')
+    parser.add_argument('--emapper_datapath', dest = 'emapper_data', required= True,help="Output path")
     parser.add_argument('--run_treeprofiler_emapper_annotation', dest='path2emapper_main')
     parser.add_argument('--run_treeprofiler_emapper_pfams', dest='path2emapper_pfams')
     parser.add_argument('--run_recovery', dest = 'run_recovery',  choices= ["run-align", "skip-align"])
