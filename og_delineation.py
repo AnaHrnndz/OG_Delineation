@@ -343,9 +343,9 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     
 
     # 3. Outliers and Dups score functions
-    t, CONTENT = run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
- 
-
+    t, CONTENT, total_outliers = run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
+    
+    
     # 4. Detect HQ-Duplications
     t,  taxid_dups_og  = run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args)
 
@@ -356,7 +356,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
 
     # 6. Optionally skip get all orthologs pairs
     if not args.skip_get_pairs:
-        clean_pairs, strict_pairs = pairs.get_all_pairs(CONTENT)
+        clean_pairs, strict_pairs = pairs.get_all_pairs(t, total_outliers)
         pairs.write_pairs_table(clean_pairs, strict_pairs, path_out, name_tree)
 
 
@@ -449,7 +449,7 @@ def get_args():
     parser.add_argument('--user_taxonomy_counter', default=None)
     parser.add_argument('--reftree', default=None)
     parser.add_argument('--run_emapper', action='store_true')
-    parser.add_argument('--emapper_datapath', dest = 'emapper_data', required= True,help="Output path")
+    parser.add_argument('--emapper_datapath', dest = 'emapper_data')
     parser.add_argument('--run_treeprofiler_emapper_annotation', dest='path2emapper_main')
     parser.add_argument('--run_treeprofiler_emapper_pfams', dest='path2emapper_pfams')
     parser.add_argument('--run_recovery', dest = 'run_recovery',  choices= ["run-align", "skip-align"])

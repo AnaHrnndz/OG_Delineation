@@ -38,6 +38,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
 
     # Detect long branches
     long_leaves = detect_long_branches(t)
+    total_outliers = set()
 
     for n in t.traverse("preorder"):
 
@@ -134,6 +135,8 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             n.add_prop('so_score', so_score)
             n.add_prop('sp_out', list(sp_out))
 
+            total_outliers.update(leaves_out)
+
 
 
             #   Load_node_scores add properties: score1, score2,  inpalalogs_rate, dup_score and species losses
@@ -175,7 +178,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
 
     t, props = utils.run_clean_properties(t)
 
-    return t, CONTENT
+    return t, CONTENT, total_outliers
 
 
 
