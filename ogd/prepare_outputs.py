@@ -21,23 +21,23 @@ def get_seq2og(ogs_info):
 
 
 
-def write_seq2ogs(seq2ogs, path, name_tree):
+def write_seq2ogs(seq2ogs, path, clean_name_tree):
 
     """
         Write a table with seq2ogs info
     """
 
     
-    name_fam = name_tree.split('.')[0]
+    #clean_name_tree = clean_name_tree.split('.')[0]
     seq2og_list =[]
-    seq2ogs_out = open(path+'/'+name_fam+'.seq2ogs.tsv', 'w')
+    seq2ogs_out = open(path+'/'+clean_name_tree+'.seq2ogs.tsv', 'w')
     for seq, ogs in seq2ogs.items():
         seq2og_list.append({seq:list(ogs)})
         seq2ogs_out.write(seq+'\t'+','.join(list(ogs))+'\n')
 
     seq2ogs_out.close()
 
-    seq2ogs_json = (path+'/'+name_fam+'.seq2ogs.jsonl')
+    seq2ogs_json = (path+'/'+clean_name_tree+'.seq2ogs.jsonl')
     with open(seq2ogs_json, "w") as file:
         for seq in seq2og_list:
             file.write(json.dumps(seq) + "\n")
@@ -51,6 +51,7 @@ def write_ogs_info(ogs_info, clean_name_tree, path):
 
     
     name_out =  path+'/'+clean_name_tree+'.ogs_info.tsv'
+
 
     with open(name_out, "w",  newline='') as myfile:
         w = csv.writer(myfile, delimiter='\t')

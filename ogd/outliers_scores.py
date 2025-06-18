@@ -106,6 +106,8 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
            
             #   Re-calculate species overlap after detect outliers
             overlaped_spces = set(sp_ch1 & sp_ch2)
+            if len(n.get_children()) >2:
+                print(n)
 
             if len(overlaped_spces)>0:
                 so_score = round(float(len(overlaped_spces) / len(set(sp_in))),4)

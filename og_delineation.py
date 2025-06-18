@@ -12,6 +12,8 @@ import re
 import csv
 import pathlib
 import tempfile
+import sys
+sys.setrecursionlimit(10000)
 
 from ogd.emapper_annotate import annotate_with_emapper, annot_treeprofiler
 from ogd.recovery import recover_sequences
@@ -23,6 +25,12 @@ from ogd.select_duplications import  run_get_main_dups
 from ogd.orthologs_groups import get_all_ogs
 import ogd.prepare_outputs as prepare_outputs
 from ogd.timer import Timer
+
+
+import ete4
+from ete4.smartview import Layout, explorer
+
+from ogd.import_layouts import all_layouts
 
 #from messy_ogs import get_messy_groups, annotate_messy_og
 
@@ -80,8 +88,10 @@ def load_tree_local(tree=None, taxonomy = None, sp_delimitator = None):
     print(mssg1)
   
     
-    t = PhyloTree(open(tree), parser = 0)
-
+    #t = PhyloTree(open(tree), parser = 0)
+    t = PhyloTree(open(tree))
+    t.resolve_polytomy()
+   
     t.set_species_naming_function(lambda node: node.name.split(sp_delimitator)[0])
 
     return t
@@ -175,7 +185,6 @@ def load_taxonomy_counter(reftree=None, user_taxonomy_counter=None):
 
         level2sp_mem = get_taxonomy_counter(reftree)
 
-   
     return level2sp_mem
 
 
@@ -336,11 +345,12 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     reftree = load_reftree(rtree = args.reftree, t = t, taxonomy_db = taxonomy_db)
     level2sp_mem = load_taxonomy_counter(reftree=reftree, user_taxonomy_counter = args.user_taxonomy_counter)
     tmpdir = create_tmp(path_out)
-    
+
+  
 
     # 2. Tree setup (Pre-analysis):  resolve polytomies, rooting, ncbi annotation, etc
     t_nw , sp_set, total_mems_in_tree, num_total_sp = run_setup(t, name_tree, taxonomy_db, path_out, tmpdir, args)
-    
+   
 
     # 3. Outliers and Dups score functions
     t, CONTENT, total_outliers = run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
@@ -357,7 +367,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     # 6. Optionally skip get all orthologs pairs
     if not args.skip_get_pairs:
         clean_pairs, strict_pairs = pairs.get_all_pairs(t, total_outliers)
-        pairs.write_pairs_table(clean_pairs, strict_pairs, path_out, name_tree)
+        pairs.write_pairs_table(clean_pairs, strict_pairs, path_out, clean_name_tree)
 
 
     # 7. Optionally modify Basal-OGs by recovering sequences
@@ -397,11 +407,23 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     prepare_outputs.write_ogs_info(ogs_info, clean_name_tree, path_out)
 
     seq2ogs = prepare_outputs.get_seq2og(ogs_info)
-    prepare_outputs.write_seq2ogs(seq2ogs, path_out,  name_tree)
+    prepare_outputs.write_seq2ogs(seq2ogs, path_out,  clean_name_tree)
 
     t, all_props = utils.run_clean_properties(t)
 
-    utils.run_write_post_tree(t, name_tree, path_out, all_props)
+    utils.run_write_post_tree(t, clean_name_tree, path_out, all_props)
+
+    if args.open_visualization:
+        props_popup = ['node_is_og', 'dist', 'species_losses', 'node_create_og', 'lca_node_name', 'len_leaves_in', 
+        'taxid', 'sci_name', 'lineage', 'lca_dup', 'inparalogs_rate', 'ch1_name', 'dup_node_name', 'is_root', 
+        'total_leaves', 'dups_up', 'ogs_up', 'common_name', 'dups_down', 'so_score_dup','ogs_down', 'score1', 
+        'rank', 'dup_lineage', 'lca_node', 'len_leaves_out', 'species_losses_percentage', 'name', 'ch2_name', 
+        'score2', 'sp_out', 'so_score', 'leaves_out','dup_score', 'overlap', 'evoltype_2', 'mOG', 'len_sp_in', 
+        'best_tax', 'node_is_mog', 'recover_seqs', 'recover_in', 'Preferred_name', 'Preferred_name_counter',
+        'eggNOG_OGs_counter', 'eggNOG_OGs', 'long_branch_outlier']
+        t.explore(name = clean_name_tree, layouts = all_layouts, show_leaf_name = False , include_props = props_popup, keep_server=True , host = 'localhost', port = 5000)
+       
+        
 
 
 
@@ -455,6 +477,7 @@ def get_args():
     parser.add_argument('--run_recovery', dest = 'run_recovery',  choices= ["run-align", "skip-align"])
     parser.add_argument('--skip_get_pairs', action='store_true')
     parser.add_argument('--sp_delimitator', dest = 'sp_delim', default='-')
+    parser.add_argument('--open_visualization', action='store_true')
 
     return parser.parse_args()
 

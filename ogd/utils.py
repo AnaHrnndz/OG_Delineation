@@ -130,21 +130,21 @@ def clean_string(string):
 
 
 def remove_problematic_characters(name):
-    clean_name = name.replace('-','|').replace('.faa', '').replace('.nw', '').replace('.fa', '').replace('.fasta','')
+    clean_name = name.replace('-','_').replace('.faa', '').replace('.nw', '').replace('.fa', '').replace('.fasta','')
 
     return clean_name
 
 
 
-def run_write_post_tree(t, name_tree, path_out, all_props):
+def run_write_post_tree(t, clean_name_tree, path_out, all_props):
 
     """
         Write newick file after the analysis
         TODO: return nothing????
     """
-    name_fam = name_tree.split('.',1)[0]
+    #name_fam = name_tree.split('.',1)[0]
 
-    post_tree = path_out+'/'+name_fam+'.tree_annot.nw'
+    post_tree = path_out+'/'+clean_name_tree+'.tree_annot.nw'
     t.write(outfile=post_tree, props=all_props, format_root_node = True)
 
     return

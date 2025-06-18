@@ -65,16 +65,16 @@ def get_all_pairs(t, total_outliers):
     return total_pairs, strict_pairs
 
 
-def write_pairs_table(clean_pairs, strict_pairs,path_out, name_tree):
+def write_pairs_table(clean_pairs, strict_pairs,path_out, clean_name_tree):
 
-    name_fam = name_tree.split('.',1)[0]
-    pairs_results = path_out+'/'+name_fam+'.pairs.tsv'
+    #name_fam = name_tree.split('.',1)[0]
+    pairs_results = path_out+'/'+clean_name_tree+'.pairs.tsv'
 
     with open(pairs_results, 'w') as fout:
         for pair in clean_pairs:
             fout.write('\t'.join(list(pair))+'\n')
 
-    strict_pairs_results = path_out+'/'+name_fam+'.stric_pairs.tsv'
+    strict_pairs_results = path_out+'/'+clean_name_tree+'.stric_pairs.tsv'
 
     with open(strict_pairs_results, 'w') as fout:
         for pair in strict_pairs:

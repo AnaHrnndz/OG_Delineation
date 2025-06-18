@@ -2,7 +2,8 @@ import subprocess
 from ete4 import  PhyloTree, GTDBTaxa
 import ogd.utils as utils
 import re
-
+import sys
+sys.setrecursionlimit(10000)
 ## 2. Preanalysis - Tree setup  ##
 
 chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
@@ -22,15 +23,13 @@ def run_setup(t, name_tree, taxonomy_db, path_out, tmpdir, args):
     rooting = args.rooting
 
     sp_delimitator = args.sp_delim
-
+    
     t.resolve_polytomy()
-
-    t = check_branch_legth(t)
-
+    
     t = run_rooting(t, rooting, tmpdir, sp_delimitator)
 
     t = add_taxomical_annotation(t, taxonomy_db)
-
+   
     # Total members(leafs name) in tree
     total_mems_in_tree = set(t.leaf_names())
 
@@ -58,25 +57,25 @@ def run_setup(t, name_tree, taxonomy_db, path_out, tmpdir, args):
 
 
 
-def check_branch_legth(t):
+# def check_branch_legth(t):
 
-    """
-    Preguntar Jordi
-    """
-    lenghts = list()
-    for n in t.traverse():
-        if n.dist != None:
-            lenghts.append(n.dist)
+   
+    # lenghts = list()
+    # for n in t.traverse():
+        # if n.dist != None:
+            # lenghts.append(n.dist)
+            # if n.dist == 0.0:
+                # print (len(n), n.dist)
         
 
-    if (all(v == 0.0 for v in lenghts)) == True:
-        for n in t.traverse():
-            if n.dist != None:
-                n.dist = 1.0
-            else:
-                print(len(n))
+    # if (all(v == 0.0 for v in lenghts)) == True:
+        # for n in t.traverse():
+            # if n.dist != None:
+                # n.dist = 1.0
+            # else:
+                # print(len(n))
 
-    return t
+    # return t
 
 
 def run_rooting(t, rooting, tmpdir, sp_delimitator):
@@ -94,11 +93,13 @@ def run_rooting(t, rooting, tmpdir, sp_delimitator):
             print('Error in Midpoint')
 
     elif rooting == "MinVar":
+        
         t = run_minvar(t, tmpdir, sp_delimitator)
+        
 
     else:
         print('No rooting')
-
+    
     return t
 
 
@@ -127,8 +128,6 @@ def run_minvar(t, tmpdir, sp_delimitator):
 
     t_minvar = PhyloTree(open(path2tmptree), parser = 0)
 
-    #check that minvar run and its not oppening an old tree from previous run
-
     t_minvar.set_species_naming_function(lambda node: node.name.split(sp_delimitator)[0])
 
     return t_minvar
@@ -140,9 +139,9 @@ def add_taxomical_annotation(t, taxonomy_db):
         Add taxonomical annotation to nodes (sci_name, taxid, named_lineage, lineage, rank)
         Parsing function used to extract species name from a node’s name.
     """
-
+    
     taxonomy_db.annotate_tree(t,  taxid_attr="species") 
-        
+    
     return t
 
 
