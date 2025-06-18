@@ -421,7 +421,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
         'score2', 'sp_out', 'so_score', 'leaves_out','dup_score', 'overlap', 'evoltype_2', 'mOG', 'len_sp_in', 
         'best_tax', 'node_is_mog', 'recover_seqs', 'recover_in', 'Preferred_name', 'Preferred_name_counter',
         'eggNOG_OGs_counter', 'eggNOG_OGs', 'long_branch_outlier']
-        t.explore(name = clean_name_tree, layouts = all_layouts, show_leaf_name = False , include_props = props_popup, keep_server=True , host = 'localhost', port = 5000)
+        t.explore(name = clean_name_tree, layouts = all_layouts, show_leaf_name = False , include_props = props_popup, keep_server=True , host = '0.0.0.0', port = 5000)
        
         
 
