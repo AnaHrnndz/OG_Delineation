@@ -2,12 +2,17 @@
 from ete4.smartview import Layout, TextFace, RectFace, BoxFace, BoxFace
 from collections import  OrderedDict, defaultdict
 import json
+from pathlib import Path
 
 
-with open("ogd/egg7_color_taxid.json", "r") as f:
+json_path_taxid = Path(__file__).parent / "egg7_color_taxid.json"
+json_path_sciname = Path(__file__).parent / "egg7_color_sciname.json"
+
+with open(json_path_taxid, "r") as f:
+
     colors_taxid = json.load(f)
 
-with open("ogd/egg7_color_sciname.json", "r") as f:
+with open(json_path_sciname, "r") as f:
     colors_sciname = json.load(f)
 
 
