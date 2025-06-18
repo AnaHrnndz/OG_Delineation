@@ -4,10 +4,10 @@ from collections import  OrderedDict, defaultdict
 import json
 
 
-with open("./ogd/egg7_color_taxid.json", "r") as f:
+with open("ogd/egg7_color_taxid.json", "r") as f:
     colors_taxid = json.load(f)
 
-with open("./ogd/egg7_color_sciname.json", "r") as f:
+with open("ogd/egg7_color_sciname.json", "r") as f:
     colors_sciname = json.load(f)
 
 
