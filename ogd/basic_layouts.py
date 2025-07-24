@@ -98,5 +98,8 @@ def draw_node_lca_rects(node, collapsed):
         lca = node.props.get('lca_node_name')
         color = colors_sciname.get(lca, 'grey')
         lca_face = TextFace(lca, rotation=90, style={'fill': 'black'})
-        level = get_level(node)+7
+        level = get_level(node)+10
         return [ RectFace(wmax= 30, style={'fill': color, 'stroke': 'grey'}, column=level, text=lca_face, position = 'aligned') ]
+
+
+

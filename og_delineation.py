@@ -26,11 +26,10 @@ from ogd.orthologs_groups import get_all_ogs
 import ogd.prepare_outputs as prepare_outputs
 from ogd.timer import Timer
 
-
 import ete4
 from ete4.smartview import Layout, explorer
-
 from ogd.import_layouts import all_layouts
+import ogd.emapper_layouts as el
 
 #from messy_ogs import get_messy_groups, annotate_messy_og
 
@@ -253,33 +252,35 @@ def annotate_root(ogs_info, t, name_tree, total_mems_in_tree, sp_set, seqs_in_og
 
     for dup_node in t.search_nodes(node_create_og='True'):
         lca_dup = dup_node.props.get('lca_node')
+        
         mems_dup = set(dup_node.props.get('leaves_in'))
         lca_all_dups.add(lca_dup)
         taxlev2ogs[lca_dup].add(dup_node.name)
         taxlev2mems[lca_dup].update(mems_dup)
 
+   
     taxlev_list = []
-    for taxlev, og in taxlev2ogs.items():
+    #for taxlev, og in taxlev2ogs.items():
         
         #if isinstance(taxlev, str):
-        taxlev = int(taxlev)
+        #taxlev = int(taxlev)
 
-        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-            sci_name = taxonomy_db.get_taxid_translator([taxlev])[taxlev]
+        # if (str(taxonomyogd_env_db).split('.')[1]) == 'ncbi_taxonomy':
+            # sci_name = taxonomy_db.get_taxid_translator([taxlev])[taxlev]
         
-        elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-            sci_name = taxlev
+        # elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+            # sci_name = taxlev
           
-        sci_name_taxid = sci_name+'_'+str(taxlev)
-        ogs_str = '_'.join(list(og))
-        num_mems = len(taxlev2mems[taxlev])
+        # sci_name_taxid = sci_name+'_'+str(taxlev)
+        # ogs_str = '_'.join(list(og))
+        # num_mems = len(taxlev2mems[taxlev])
 
-        tax_str = '|'.join([sci_name_taxid, ogs_str,str(num_mems)])
+        # tax_str = '|'.join([sci_name_taxid, ogs_str,str(num_mems)])
 
-        taxlev_list.append(tax_str)
+        # taxlev_list.append(tax_str)
 
-    taxlev_str = '@'.join(taxlev_list)
-    t.add_prop('taxlev2ogs', taxlev_str)
+    # taxlev_str = '@'.join(taxlev_list)
+    # t.add_prop('taxlev2ogs', taxlev_str)
 
     t.add_prop("OGD_annot", True)
 
@@ -382,7 +383,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     # 8. Optionally add annotations from emapper
         # 8.1 Run emapper and annotate with treeprofiler
     if args.run_emapper:
-        t = annotate_with_emapper(t, args.alg, tmpdir, args.emapper_data)
+        t = annotate_with_emapper(t, args.alg, tmpdir, args.emapper_dmnd, args.emapper_pfam)
         
         # 8.2 Only annotate with treeprofiler
     if args.path2emapper_main:
@@ -421,7 +422,16 @@ def run_app(tree, abs_path, name_tree, path_out, args):
         'score2', 'sp_out', 'so_score', 'leaves_out','dup_score', 'overlap', 'evoltype_2', 'mOG', 'len_sp_in', 
         'best_tax', 'node_is_mog', 'recover_seqs', 'recover_in', 'Preferred_name', 'Preferred_name_counter',
         'eggNOG_OGs_counter', 'eggNOG_OGs', 'long_branch_outlier']
-        t.explore(name = clean_name_tree, layouts = all_layouts, show_leaf_name = False , include_props = props_popup, keep_server=True , host = '0.0.0.0', port = 5000)
+
+        # t.link_to_alignment(alignment=args.alg, alg_format='fasta') 
+        # for l in t:
+            # len_alg = len(l.props['sequence'])
+            # break
+
+        # pfam_layout = Layout('PFAM', draw_node=el.draw_pfam_domains(t, len_alg=len_alg))
+        # all_layouts.append(pfam_layout)
+
+        t.explore(name = clean_name_tree, layouts = all_layouts, show_leaf_name = False , include_props = props_popup, keep_server=True , host = '138.4.138.141', port = 5000)
        
         
 
@@ -446,7 +456,7 @@ def get_args():
     parser.add_argument('--output_path', dest = 'out_path', required= True,
                     help="Output path")
     
-    parser.add_argument('--sp_ovlap_all', default = 0.01, dest = 'so_all', type = float,
+    parser.add_argument('--sp_ovlap_all', default = 0.1, dest = 'so_all', type = float,
                     help='Species overlap treshold used for all nodes. ' )
 
     parser.add_argument('--sp_ovlap_euk', dest = 'so_euk', type = float, 
@@ -464,14 +474,15 @@ def get_args():
     parser.add_argument('--lineage_threshold', dest = 'lineage_thr' , default = 0.05, type = float)
     parser.add_argument('--best_taxa_threshold', dest = 'best_tax_thr' , default = 0.9, type = float)
     parser.add_argument('--inherit_outliers', dest = 'inherit_out', choices = ['Yes', 'No'], default = 'Yes', type = str)
-    parser.add_argument('--species_losses_perct', dest = 'sp_loss_perc' , default = 0.3, type = float)
+    parser.add_argument('--species_losses_perct', dest = 'sp_loss_perc' , default = 0.7, type = float)
     parser.add_argument('--rooting', choices = ['Midpoint', 'MinVar', ''])
     parser.add_argument('--taxonomy_type', choices=['NCBI', 'GTDB'], default='NCBI')
     parser.add_argument('--user_taxonomy', default= None)
     parser.add_argument('--user_taxonomy_counter', default=None)
     parser.add_argument('--reftree', default=None)
     parser.add_argument('--run_emapper', action='store_true')
-    parser.add_argument('--emapper_datapath', dest = 'emapper_data')
+    parser.add_argument('--emapper_dmnd_db', dest = 'emapper_dmnd')
+    parser.add_argument('--emapper_pfam_db', dest = 'emapper_pfam')
     parser.add_argument('--run_treeprofiler_emapper_annotation', dest='path2emapper_main')
     parser.add_argument('--run_treeprofiler_emapper_pfams', dest='path2emapper_pfams')
     parser.add_argument('--run_recovery', dest = 'run_recovery',  choices= ["run-align", "skip-align"])
