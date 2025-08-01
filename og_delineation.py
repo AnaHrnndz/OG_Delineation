@@ -27,9 +27,6 @@ import ogd.prepare_outputs as prepare_outputs
 from ogd.timer import Timer
 
 import ete4
-from ete4.smartview import Layout, explorer
-from ogd.import_layouts import all_layouts
-import ogd.emapper_layouts as el
 
 #from messy_ogs import get_messy_groups, annotate_messy_og
 
@@ -415,6 +412,13 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     utils.run_write_post_tree(t, clean_name_tree, path_out, all_props)
 
     if args.open_visualization:
+
+        
+        from ete4.smartview import Layout, explorer
+        from ogd.import_layouts import all_layouts
+        import ogd.emapper_layouts as el
+
+
         props_popup = ['node_is_og', 'dist', 'species_losses', 'node_create_og', 'lca_node_name', 'len_leaves_in', 
         'taxid', 'sci_name', 'lineage', 'lca_dup', 'inparalogs_rate', 'ch1_name', 'dup_node_name', 'is_root', 
         'total_leaves', 'dups_up', 'ogs_up', 'common_name', 'dups_down', 'so_score_dup','ogs_down', 'score1', 

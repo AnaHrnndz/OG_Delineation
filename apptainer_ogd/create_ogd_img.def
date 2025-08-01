@@ -1,0 +1,44 @@
+BootStrap: docker
+From: ubuntu:22.04
+
+%post
+    apt -y update
+
+    # Otherwise tzdata asks for input when installing in ubuntu 22.04.
+    DEBIAN_FRONTEND=noninteractive apt install -y tzdata
+    
+    # Install the normal system packages that we want for ete4.
+    apt -y install wget python3.10-full python3-pip ipython3 python-is-python3 \
+       python3-requests python3-numpy python3-scipy \
+       python3-brotli python3-bottle mafft git
+    
+    
+    # Install ete4 itself
+    pip install --no-cache-dir https://github.com/etetoolkit/ete/archive/ete4.zip
+    pip install --no-cache-dir treeswift cvxopt numpy FastRoot eggnog-mapper
+
+    git clone https://github.com/AnaHrnndz/OG_Delineation.git /opt/OG_Delineation
+
+    # Hacer ejecutable el script si no lo es
+    chmod +x /opt/OG_Delineation/og_delineation.py
+
+    # Añadir al PATH
+    echo 'export PATH="/opt/OG_Delineation:$PATH"' >> /environment
+
+
+   
+%environment
+    export LC_ALL=C
+    export PATH="/opt/OG_Delineation:$PATH"
+    
+    #Esto asegura que Python pueda importar correctamente utils, rooting, u otros módulos desde ese directorio cuando se ejecuta og_delineation.py.
+    export PYTHONPATH=/opt/OG_Delineation:$PYTHONPATH
+
+%runscript
+    exec python3 /opt/OG_Delineation/og_delineation.py "$@"
+
+%labels
+    Author Ana Hernández Plaza
+
+%help
+    Esta es una imagen de Apptainer para ejecutar OG_Delineation con sus dependencias.
