@@ -1,4 +1,4 @@
-# 🧬 OG_Delineation: Orthologous Group Delineation (OGD)
+# 🧬 OGD: Orthologous Group Delineation 
 
 
 The **OG_Delineation** algorithm is designed for **Orthologous Group Delineation (OGD)** from gene phylogenetic trees. It identifies orthologous groups based on the detection and scoring of gene duplication events.
