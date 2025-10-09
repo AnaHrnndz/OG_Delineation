@@ -15,7 +15,7 @@ The core script (`og_delineation.py`) follows these key steps to figure out the 
     * Tree rooting (e.g., *Midpoint* or *MinVar*).
     * NCBI annotation.
 3.  ** Detect outlierts and Score Calculation:** Determines key metrics:
-    * Detection of long branches and **taxonomical outliers**.
+    * Detection of long branches and **taxonomical misplaced sequencess*.
     * Calculation of: **Species Overlap (SO)**, *Duplication Score*, *Inparalogs Rate*, and *Lineage Lost*.
 4.  **HQ-Duplication Detection:** Selects high-quality duplication events that define the root of the **Orthologous Groups (OGs)**.
 5.  **OG Generation:** Structures and annotates the final orthologous groups.
@@ -30,7 +30,7 @@ The program includes modules to refine and functionally annotate the results:
 
 ### 🔄 1. Recovery Pipeline (Sequence Recovery)
 
-This module attempts to recover sequences that were initially excluded from the OGs (termed "left out" sequences) using an HMM-based process:
+This module attempts to recover sequences that were initially excluded from the OGs (leave with long branches and taxonomical misplaced sequences) using an HMM-based process:
 
 1.  Generates FASTA files for the excluded sequences and for each OG.
 2.  Creates an HMM (*Hidden Markov Model*) profile for each OG.
