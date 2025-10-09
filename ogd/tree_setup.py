@@ -13,7 +13,7 @@ def run_setup(t, name_tree, taxonomy_db, path_out, tmpdir, args):
 
     """
         Preanalysis include several steps:
-            resolve polytomies: need for sp overlap
+            
             rooting: Midpoint o MinVar
             add taxonomy annotation
             Get original seqs and species in the tree
@@ -23,8 +23,6 @@ def run_setup(t, name_tree, taxonomy_db, path_out, tmpdir, args):
     rooting = args.rooting
 
     sp_delimitator = args.sp_delim
-    
-    t.resolve_polytomy()
     
     t = run_rooting(t, rooting, tmpdir, sp_delimitator)
 

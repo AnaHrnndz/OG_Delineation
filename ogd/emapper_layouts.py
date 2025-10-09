@@ -225,6 +225,7 @@ def draw_kegg_ko(node, collapsed):
         return [TextFace(kko, style={'fill': 'purple'}, column=3, position='aligned'),
                 RectFace(wmax= 5, style={'fill': 'white'},  column=4, position = 'aligned')]
 
+
 def draw_kegg_path(node, collapsed):
     
     kpath = node.props.get('kegg_path', '')

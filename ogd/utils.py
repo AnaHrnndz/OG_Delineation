@@ -140,14 +140,14 @@ def run_write_post_tree(t, clean_name_tree, path_out, all_props):
 
     """
         Write newick file after the analysis
-        TODO: return nothing????
+        
     """
-    #name_fam = name_tree.split('.',1)[0]
+    
 
-    post_tree = path_out+'/'+clean_name_tree+'.tree_annot.nw'
-    t.write(outfile=post_tree, props=all_props, format_root_node = True)
+    post_tree_path = path_out+'/'+clean_name_tree+'.tree_annot.nw'
+    t.write(outfile=post_tree_path, props=all_props, format_root_node = True)
 
-    return
+    return post_tree_path
 
 
 def write_tree_for_minvar_rootin(t, tmpdir):

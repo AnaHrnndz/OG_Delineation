@@ -64,13 +64,16 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
                 sp_out_inherit = add_upper_outliers(n, CONTENT)
                 sp_out.update(sp_out_inherit)
 
-            #   Detect outliers
-            ch1 = n.children[0]
-            ch2 = n.children[1]
+            
 
             # Call outlierts detection and update the set with the species taxid that are outliers
             sp_out.update(outliers_detection(n, args.lineage_thr, args.best_tax_thr, CONTENT, level2sp_mem, sp_out, taxonomy_db))
 
+            
+            #   Detect outliers
+            ch1 = n.children[0]
+            ch2 = n.children[1]
+            
             #  Save info for children_node_1 and children_node_2
             ch1_name = n.children[0].props.get('name')
             ch1_leaf_names = list(ch1.leaf_names())
@@ -106,8 +109,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
            
             #   Re-calculate species overlap after detect outliers
             overlaped_spces = set(sp_ch1 & sp_ch2)
-            if len(n.get_children()) >2:
-                print(n)
+
 
             if len(overlaped_spces)>0:
                 so_score = round(float(len(overlaped_spces) / len(set(sp_in))),4)
@@ -192,13 +194,13 @@ def detect_long_branches(t):
         Remove entire nodes do not perform well when basal branches are too large (ex Phou fam)
     """
 
-    length_leaves = list()
+    #length_leaves = list()
     total_dist = list()
     for n in t.traverse():
         # Skip root dist (Root dist is None)
         if n.dist != None:
             if n.is_leaf:
-                length_leaves.append(n.dist)
+                #length_leaves.append(n.dist)
                 total_dist.append(n.dist)
             else:
                 total_dist.append(n.dist)

@@ -1,5 +1,5 @@
 
-from ete4.smartview import Layout, TextFace, RectFace, BoxFace, BoxFace
+from ete4.smartview import Layout, TextFace, RectFace, BoxFace
 from collections import  OrderedDict, defaultdict
 import json
 from pathlib import Path
