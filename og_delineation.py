@@ -337,7 +337,7 @@ def run_app(tree, abs_path, name_tree, path_out, args):
     print(mssg)
 
 
-    clean_name_tree = utils.remove_problematic_characters(name_tree)
+    clean_name_tree = utils.remove_file_extension(name_tree)
 
     t = load_tree_local(tree = tree, taxonomy = args.taxonomy_type, sp_delimitator = args.sp_delim)
     taxonomy_db = load_taxonomy(taxonomy = args.taxonomy_type, user_taxonomy= args.user_taxonomy)

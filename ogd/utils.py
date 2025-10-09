@@ -36,49 +36,67 @@ def get_gtdb_rank(gtdb_code):
     return rank
 
 
-def get_so2use(taxonomy_db, lin_lca, lca_node,args):
+def determine_so_threshold(taxonomy_db, lin_lca, args):
+    """
+    Determines the Species Overlap (SO) threshold to use based on the 
+    taxonomy type (NCBI or GTDB) and the ancestral lineage (lin_lca) of the LCA.
     
-    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+    Args:
+        taxonomy_db: The taxonomy database object (e.g., NCBI Taxonomy object).
+        lin_lca: A list of tax IDs (int) or tax names (str) in the LCA lineage.
+        args: Object containing the SO thresholds (so_euk, so_bact, so_arq, so_all, etc.).
         
-        if args.so_euk != None:
-            if 2759 in lin_lca:
-                so_2_use = args.so_euk
-            else:
-                so_2_use = args.so_all
-
-        elif args.so_bact != None:
-            if 2 in lin_lca:
-                so_2_use = args.so_bact
-            else:
-                so_2_use = args.so_all
-
-        elif args.so_arq != None:
-            if 2157 in lin_lca:
-                so_2_use = args.so_arq
-            else:
-                so_2_use = args.so_all
-
-        else:
-            so_2_use = args.so_all
-
-        
-        
-
-    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-
-        if 'd__Bacteria' in lin_lca:
-            so_2_use = args.so_bact
-        elif 'd__Archaea' in lin_lca:
-            so_2_use = args.so_arq
-        elif 'root' in lin_lca:
-            so_2_use = args.so_cell_org
-        elif 'Empty' in lin_lca:
-            so_2_use = 0.0
-        else:
-            so_2_use = args.so_all
-
+    Returns:
+        The Species Overlap threshold (float) to use.
+    """
     
-    return so_2_use
+    # 1. Initialize with the default threshold
+    so_to_use = args.so_all
+
+    # Use the string representation to determine the taxonomy type
+    taxonomy_name = str(taxonomy_db).lower()
+
+    # 2. Define search maps for tax IDs/names to SO arguments
+    
+    # Map for NCBI Taxonomy (Tax IDs)
+    NCBI_MAP = {
+        2759: args.so_euk,   # Eukaryota
+        2:    args.so_bact,   # Bacteria
+        2157: args.so_arq    # Archaea
+    }
+
+    # Map for GTDB Taxonomy (Domain names)
+    GTDB_MAP = {
+        'd__Bacteria': args.so_bact,
+        'd__Archaea': args.so_arq,
+        'root': args.so_all 
+    }
+
+    # 3. Selection logic based on taxonomy database
+    
+    if 'ncbi_taxonomy' in taxonomy_name:
+        
+        # Iterate over the NCBI map to find the most specific available threshold
+        for tax_id, so_threshold in NCBI_MAP.items():
+            
+            # Condition: User provided the threshold AND the tax_id is in the lineage
+            if so_threshold is not None and tax_id in lin_lca:
+                so_to_use = so_threshold
+                break 
+
+    elif 'gtdb_taxonomy' in taxonomy_name:
+        
+        # Iterate over the GTDB map to find the matching threshold
+        for tax_name, so_threshold in GTDB_MAP.items():
+            if tax_name in lin_lca:
+                so_to_use = so_threshold
+                break
+                
+        # Handle the special case 'Empty' for GTDB
+        if so_to_use == args.so_all and 'Empty' in lin_lca:
+            so_to_use = 0.0
+
+    return so_to_use
 
 
 def get_newick(t, all_props):
@@ -90,49 +108,60 @@ def get_newick(t, all_props):
     t = t.write(props=all_props, format_root_node=True)
     return t
 
-def run_clean_properties(t):
 
-    """
-        Clean problematic characters from some properties
-        Call clean_string()
-    """
+def run_clean_properties(tree):
 
-    # clean strings
-    all_props = set()
+    # 1. Input Handling: Ensure the input is a PhyloTree object
+    if isinstance(tree, str):
+        
+        t = PhyloTree(tree)
+    else:
+        t = tree 
 
-    #if tree came from web server is  str format,
-    if isinstance(t, str):
-        t = PhyloTree(t)
+    
+    PROPERTIES_TO_CLEAN = ["sci_name", "lca_node_name", "common_name"]
+    
+    all_prop_keys= set()
 
-    for n in t.traverse():
-        for string in ("sci_name", "lca_node_name", "common_name"):
-            prop = n.props.get(string)
-            if prop:
-                n.props[string] = clean_string(prop)
+    # 2. Traverse and Clean Properties
+    for node in t.traverse():
+        # Update the set of all property keys present in the tree
+        all_prop_keys.update(node.props.keys())
+        
+        # Iterate only through the required properties to clean
+        for prop_name in PROPERTIES_TO_CLEAN:
+            # Check if the property exists and is not None
+            prop_value = node.props.get(prop_name)
+            
+            if prop_value:
+                # Apply the cleaning function and update the property value
+                node.props[prop_name] = clean_string(prop_value)
 
-        all_props.update(set(n.props.keys()))
-
-
-    return t, all_props
+    return t, all_prop_keys
 
 
 def clean_string(string):
+    
+    clean_string = re.sub(r"'|\[|\]|\=|\-|\:", "", string)
+    return clean_string.replace(' ', '_') 
 
 
-    """
-        Remove problematic characters for newick format
-    """
-
-    clean_string = re.sub(r"'|\[|\]|\=|\.|\-|\:", "", string)
-    return clean_string
-
-
-
-
-def remove_problematic_characters(name):
-    clean_name = name.replace('-','_').replace('.faa', '').replace('.nw', '').replace('.fa', '').replace('.fasta','')
-
-    return clean_name
+def remove_file_extension(name):
+    
+    extensions = ['.faa', '.nw', '.fa', '.fasta']
+    
+    removed = True
+    while removed:
+        removed = False
+        for ext in extensions:
+           
+            if name.endswith(ext):
+               
+                name = name.removesuffix(ext)
+                removed = True
+               
+                
+    return name[:len(name)]
 
 
 

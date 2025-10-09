@@ -169,7 +169,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             lin_lca = n.props.get('lineage')
             lca_node = n.props.get('lca_node')
 
-            so_2_use = utils.get_so2use(taxonomy_db, lin_lca, lca_node,args)
+            so_2_use = utils.determine_so_threshold(taxonomy_db, lin_lca, args)
         
             if so_score >= so_2_use:
                 
