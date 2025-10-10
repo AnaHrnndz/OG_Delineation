@@ -1,6 +1,40 @@
 import re
 from ete4 import PhyloTree
 from collections import defaultdict
+import tempfile
+import sys
+import os
+
+
+
+def create_tmp(path_out):
+
+    """
+    Create a temporary directory.
+
+    Tries to create the temporary directory inside the results folder (`path_out`).
+    If it fails (e.g., due to permissions or when running in a container),
+    falls back to creating it in /tmp.
+
+    Args:
+        path_out (str): Path to the desired output directory.
+
+    Returns:
+        str: Full path to the created temporary directory, ending with a slash.
+    
+    """
+
+    try:
+        results_abs_path = os.path.abspath(path_out)
+        tmpdir = tempfile.mkdtemp(dir=results_abs_path)
+
+    except Exception as e:
+        print(f"Warning: Failed to create tmp dir in '{path_out}', using /tmp instead. Error: {e}")
+        tmpdir = tempfile.mkdtemp(prefix="ogd_", dir="/tmp")
+    
+    return tmpdir + '/'
+    
+
 
 def parse_taxid(node):
 
