@@ -6,14 +6,12 @@ import argparse
 import warnings
 import pathlib
 
-# Import the core logic function
 from ogd.ogd_core import run_ogd 
 
 # Set recursion limit early for safety in tree traversal
 sys.setrecursionlimit(10000)
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
-
 
 # --- Argument Parsing ---
 
@@ -70,15 +68,15 @@ def get_args():
     opt_pipes.add_argument('--open_visualization', action='store_true', help="Open the visualization tool after completion.")
     
     # 6. Utility
-    parser.add_argument('-v', '--version', action='store_true', help="Show version and exit.")
+    parser.add_argument('-v', '--version', 
+                        action='version',
+                        version='OGD Version beta', 
+                        help="Show version and exit.")
 
 
     args = parser.parse_args()
-    
-    # NOTE: You should implement the version check here
-    # if args.version:
-    #    print("OGD Version 1.0")
-    #    sys.exit(0)
+
+
 
     return args
 

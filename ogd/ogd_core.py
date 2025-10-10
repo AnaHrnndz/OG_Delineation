@@ -1,19 +1,20 @@
 import os
 
-
-from ogd.emapper_annotate import annotate_with_emapper, annot_treeprofiler
-from ogd.recovery import recover_sequences
-import  ogd.pairs as pairs
+from ogd.timer import Timer
 import ogd.utils as utils
+
+import ogd.handle_input as handle_input
 from ogd.tree_setup  import run_setup
 from ogd.outliers_scores import run_outliers_and_scores
 from ogd.select_duplications import  run_get_main_dups
 from ogd.orthologs_groups import get_all_ogs
+import  ogd.pairs as pairs
+from ogd.emapper_annotate import annotate_with_emapper, annot_treeprofiler
+from ogd.recovery import recover_sequences
+import ogd.final_annotations as final_annotations
 import ogd.prepare_outputs as prepare_outputs
 from ogd.run_ete4_smartview import run_smartview
-import ogd.handle_input as handle_input
-import ogd.final_annotations as final_annotations
-from ogd.timer import Timer
+
 
 
 
@@ -59,6 +60,7 @@ def run_ogd(args):
     reftree = handle_input.load_reftree(rtree = args.reftree, t = t, taxonomy_db = taxonomy_db)
     level2sp_mem = handle_input.load_taxonomy_counter(reftree=reftree, user_taxonomy_counter = args.user_taxonomy_counter)
     tmpdir = utils.create_tmp(path_out)
+
 
 
     # 2. Tree setup (Pre-analysis):  resolve polytomies, rooting, ncbi annotation, etc

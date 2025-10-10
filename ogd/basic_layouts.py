@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 
 
-json_path_taxid = Path(__file__).parent / "egg7_color_taxid.json"
-json_path_sciname = Path(__file__).parent / "egg7_color_sciname.json"
+json_path_taxid = Path(__file__).parent.parent / "data/smartview/egg7_color_taxid.json"
+json_path_sciname = Path(__file__).parent.parent / "data/smartview/egg7_color_sciname.json"
 
 with open(json_path_taxid, "r") as f:
 
