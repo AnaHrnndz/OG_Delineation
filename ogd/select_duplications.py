@@ -1,38 +1,28 @@
 import ogd.utils as utils
+from ete4 import PhyloTree # t is assumed to be a PhyloTree
+from typing import Any, Tuple, Set, List, Dict
 
-
-
-##  4. Detect Duplications and Core-OGs & PGs ##
+## 4. Detect Duplications and Core-OGs & PGs ##
 
 def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
     """
-        Select high-quality duplication nodes:
-            - Species overlap higher than min threshold
-            - More than one leave and more than one specie
-            - No more duplication nodes at the same taxonomic level below the node
+    Selects high-quality duplication nodes (HQ-Dups) to be marked as Monophyletic OGs.
+
+    HQ-Dups criteria:
+        1. Must be a duplication node (evoltype_2='D').
+        2. Must have >1 leaf and >1 species (non-trivial group).
+        3. Logic: If child nodes do NOT contain another HQ-Dup at the same LCA level, 
+           the children nodes are marked as Monophyletic OGs.
     """
 
-    # taxid_dups_og, set with the lca of the nodes that are OGs
     taxid_dups_og = set()
     
-
-    if args.so_euk == None:
-        so_euk = 'None'
-    else:
-        so_euk = args.so_euk
-
-    if args.so_bact == None:
-        so_bact = 'None'
-    else:
-        so_bact = args.so_bact
     
-    if args.so_arq == None:
-        so_arq = 'None'
-    else:
-        so_arq = args.so_arq
+    so_euk = args.so_euk if args.so_euk is not None else 'None'
+    so_bact = args.so_bact if args.so_bact is not None else 'None'
+    so_arq = args.so_arq if args.so_arq is not None else 'None'
 
     mssg = f"""
-    3. Select high quality duplication nodes
        -Species overlap threshold:
             General: {args.so_all}
             Euk: {so_euk}
@@ -40,70 +30,61 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
             Arq: {so_arq}"""
     print(mssg)
     
-
-    # Traverse tree to find the nodes that are "good" duplications and generate OGs.
+    # Optimized traversal to find HQ duplications
     for node in t.traverse("preorder"):
 
-        #if node.is_root:
-        #    pass
+        # The root is handled at the end; leaf nodes are skipped
+        if node.is_leaf:
+            continue
+        
+        # Criterion 1 & 2: Must be a Duplication and non-trivial
+        is_hq_candidate = (
+            node.props.get('evoltype_2') == 'D' and 
+            len(node.props.get('leaves_in', [])) > 1 and 
+            len(node.props.get('sp_in', [])) > 1
+        )
 
-        if not node.is_leaf and node.props.get('evoltype_2') == 'D'  \
-        and len(node.props.get('leaves_in')) >1 and len(node.props.get('sp_in')) > 1 :
+        if is_hq_candidate:
+            
+            lca_target = node.props.get('lca_node')
+            
+            # --- Criterion 3: Check for HQ duplications below the current node ---
+            
+            # 3.1. Search for D duplications under the current node
+            ch1, ch2 = node.children[0], node.children[1]
 
-            dups_under_node = []
-            for n in node.search_nodes(evoltype_2='D'):
+            # Search for D-nodes under CH1 and CH2 with the same LCA_TARGET
+            dups_under_ch1 = list(ch1.search_nodes(evoltype_2='D', lca_node=lca_target))
+            dups_under_ch2 = list(ch2.search_nodes(evoltype_2='D', lca_node=lca_target))
+            
+            # 3.2. Validate if the duplications found under the children meet the HQ requirement
+            
+            # Determine if an HQ-Dup exists under CH1 with the same LCA
+            save_dups_ch1 = _count_hq_dups_under_child(dups_under_ch1)
+            
+            # Determine if an HQ-Dup exists under CH2 with the same LCA
+            save_dups_ch2 = _count_hq_dups_under_child(dups_under_ch2)
 
-                if n.name!= node.name:
-                    dups_under_node.append(n)
+            
+            # 3.3. Annotate Monophyletic OGs
+            
+            # If there are no HQ-Dups under CH1, CH1 is a monophyletic OG
+            if save_dups_ch1 == 0:
+                _annotate_og_child(taxid_dups_og, node, ch1, taxonomy_db)
 
-            # There are more dups under the node
-            if len(dups_under_node) > 0:
-
-                lca_target = node.props.get('lca_node')
-
-                #Save Dups under child1 and child2 that have the same lca_node
-                dups_under_ch1 = list(node.children[0].search_nodes(evoltype_2='D', lca_node=lca_target))
-                dups_under_ch2 = list(node.children[1].search_nodes(evoltype_2='D', lca_node=lca_target))
-
-                save_dups_ch1 = 0 
-                save_dups_ch2 = 0 
-
-                # Check that dups under child1 and child2 (that have the same lca) fit all requirements : species overlap min requirement,
-                # more than 1 leaves and more than 1 species
-
-                for n_ in  dups_under_ch1:
-                    if len(n_.props.get('leaves_in')) >1 and len(n_.props.get('sp_in'))> 1 :
-                        save_dups_ch1 += 1
-
-                for n_ in  dups_under_ch2:
-                    if  len(n_.props.get('leaves_in'))>1 and len(n_.props.get('sp_in'))> 1 :
-                        save_dups_ch2 += 1
-
-                if save_dups_ch1 == 0:
-                    annotate_dups_ch(taxid_dups_og, node, 'ch1', taxonomy_db)
-
-                if save_dups_ch2 == 0 :
-                    annotate_dups_ch(taxid_dups_og ,node, 'ch2', taxonomy_db)
-
-
-            elif len(dups_under_node) == 0:
-                annotate_dups_ch(taxid_dups_og, node, 'ch1', taxonomy_db)
-                annotate_dups_ch(taxid_dups_og, node, 'ch2', taxonomy_db)
+            # If there are no HQ-Dups under CH2, CH2 is a monophyletic OG
+            if save_dups_ch2 == 0:
+                _annotate_og_child(taxid_dups_og, node, ch2, taxonomy_db)
 
 
-    #  Now decide if root is OG or not,
-    #  if there are not dups at the same level that root's lca
-    #  then root is a monophyletic_og 
-    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-        lca_root = int(t.props.get('lca_node'))
-    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-        lca_root = (t.props.get('lca_node'))
+            # Annotate that this parent node created OGs
+            if save_dups_ch1 == 0 or save_dups_ch2 == 0:
+                node.add_prop('node_create_og', 'True')
 
-    
-    if len(list(t.search_nodes(monophyletic_og='True', lca_node=lca_root))) == 0:
-        t.add_prop('monophyletic_og', 'True')
+    # 3. Decide if the root is a monophyletic OG
+    _annotate_root_og(t)
 
-    
+    # 4. Final cleanup
     t, props = utils.run_clean_properties(t)
 
     return t, taxid_dups_og
@@ -111,41 +92,49 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
 
 
 
-def annotate_dups_ch(taxid_dups_og, node, ch_node, taxonomy_db):
-
+def _count_hq_dups_under_child(dups_under_child):
     """
-    Add props and save info about the children node that is OG
-    node is the duplication node
-    target node is the node that is OG
-    node = parent
-    target node = child
+    Counts how many duplication nodes in the list meet the HQ criteria
+    (>1 leaf and >1 species).
     """
+    count = 0
+    for n_ in dups_under_child:
+        if len(n_.props.get('leaves_in', [])) > 1 and len(n_.props.get('sp_in', [])) > 1:
+            count += 1
+    return count
 
-    if ch_node == 'ch1':
-        og_name_ch = node.props.get('ch1_name')
-        og_ch_mems = node.props.get('leaves_ch1')
-        sp_ch = node.props.get('sp_in_ch1')
-        target_node = next(node.search_nodes(name=og_name_ch))
 
-    elif ch_node == 'ch2':
-        og_name_ch = node.props.get('ch2_name')
-        og_ch_mems = node.props.get('leaves_ch2')
-        sp_ch = node.props.get('sp_in_ch2')
-        target_node = next(node.search_nodes(name=og_name_ch))
-
-    if  len(sp_ch) > 1 and len(og_ch_mems) > 1:
+def _annotate_og_child(taxid_dups_og, parent_node, target_node, taxonomy_db):
+    """
+    Adds properties to a child node that has been identified as a Monophyletic OG.
+    """
+    
+    # The child must also be non-trivial
+    sp_ch = target_node.props.get('sp_in', [])
+    og_ch_mems = target_node.props.get('leaves_in', [])
+    
+    if len(sp_ch) > 1 and len(og_ch_mems) > 1:
         target_node.add_prop('monophyletic_og', 'True')
-        target_node.add_prop('lca_dup', node.props.get('lca_node'))
-        target_node.add_prop('so_score_dup', node.props.get('so_score'))
+        target_node.add_prop('lca_dup', parent_node.props.get('lca_node'))
+        target_node.add_prop('so_score_dup', parent_node.props.get('so_score'))
 
-        dup_lin = utils.get_lineage(taxonomy_db, node.props.get('lca_node'))
+        #  Get and save the lineage only once
+        dup_lca = parent_node.props.get('lca_node')
+        dup_lin = utils.get_lineage(taxonomy_db, dup_lca)
         target_node.add_prop('dup_lineage', dup_lin)
         
-        target_node.add_prop('dup_node_name', node.props.get('name'))
+        target_node.add_prop('dup_node_name', parent_node.props.get('name'))
 
-        taxid_dups_og.add(node.props.get('lca_node'))
-        node.add_prop('node_create_og', 'True')
-        
+        taxid_dups_og.add(dup_lca)
+    
 
-
-
+def _annotate_root_og(t):
+    """
+    Decides if the root node should be marked as Monophyletic OG.
+    """
+    lca_root = t.props.get('lca_node')
+    
+    # Use the 'lca_node' property directly in the search.
+    # If there are no monophyletic OGs sharing the root's LCA, the root is an OG.
+    if not list(t.search_nodes(monophyletic_og='True', lca_node=lca_root)):
+        t.add_prop('monophyletic_og', 'True')
