@@ -1,11 +1,22 @@
 import re
 from ete4 import PhyloTree
-from collections import defaultdict
+from collections import defaultdict, Counter, OrderedDict
 import tempfile
 import sys
 import os
 
+chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
+
+
+
+class OrderedCounter(Counter, OrderedDict):
+     'Counter that remembers the order elements are first seen'
+     def __repr__(self):
+         return '%s(%r)' % (self.__class__.__name__,
+                            OrderedDict(self))
+     def __reduce__(self):
+         return self.__class__, (OrderedDict(self),)
 
 def create_tmp(path_out):
 
@@ -274,4 +285,30 @@ def update_sp_per_level_in_node(sp_per_level_in_node, taxonomy_db, l):
         for tax in l.props.get('named_lineage').split('|'):
             sp_per_level_in_node[tax].add(str(l.props.get('taxid')))
 
-    
+
+
+
+def make_name(i):
+
+    """
+        Create names for internal nodes
+    """
+
+    name = ''
+    while i >= 0:
+        name = chars[i % len(chars)] + name
+        i = i // len(chars) - 1
+    return name
+
+
+def get_depth(node):
+
+    """
+        Get depth of internal nodes
+        Depth = number nodes from root node to target node
+    """
+    depth = 0
+    while node is not None:
+        depth += 1
+        node = node.up
+    return depth
