@@ -1,153 +1,181 @@
+# -*- coding: utf-8 -*-
+"""
+handle_input.py - Loads and preprocesses all input files for the OGD pipeline.
+"""
 
-
-from ete4 import PhyloTree, NCBITaxa, GTDBTaxa
-from collections import defaultdict
-import os
 import json
 import sys
+from collections import defaultdict
+from pathlib import Path
+from typing import Tuple, Dict, Any
 
+from ete4 import PhyloTree, NCBITaxa, GTDBTaxa
 
-def load_all_input_files(args):
+TaxonomyDB = Any # Represents NCBITaxa or GTDBTaxa objects
+
+def load_all_input_files(args: Any) -> Tuple[PhyloTree, TaxonomyDB, PhyloTree, Dict[str, set]]:
     """
-    Consolidates loading of the gene tree, taxonomy database, reference species tree, 
-    and the species counter for the OGD pipeline.
-    
+    Consolidates loading of all primary input files for the pipeline.
+
+    Args:
+        args: The command-line arguments object from argparse.
+
     Returns:
-        A tuple: (gene_tree, taxonomy_db, ref_species_tree, level2sp_mem)
+        A tuple containing the loaded gene tree, taxonomy database object,
+        reference species tree, and the taxonomy counter dictionary.
     """
     print("    - Loading inputs and databases...")
     
     # 1. Load Taxonomy Database
-    taxonomy_db = load_taxonomy(taxonomy=args.taxonomy_type, user_taxonomy=args.user_taxonomy)
+    taxonomy_db = load_taxonomy(
+        taxonomy_type=args.taxonomy_type, 
+        user_taxonomy_path=args.user_taxonomy
+    )
     
     # 2. Load Gene Tree
-    t = load_gene_tree(tree_path=args.tree, sp_delimitator=args.sp_delim)
+    gene_tree = load_gene_tree(
+        tree_path=args.tree, 
+        sp_delimitator=args.sp_delim
+    )
     
-    # 3. Load/Generate Reference Species Tree
-    reftree = load_reftree(rtree_path=args.reftree, t=t, taxonomy_db=taxonomy_db)
+    # 3. Load or Generate Reference Species Tree
+    ref_species_tree = load_reftree(
+        rtree_path=args.reftree, 
+        gene_tree=gene_tree, 
+        taxonomy_db=taxonomy_db
+    )
     
-    # 4. Load/Generate Taxonomy Counter
-    level2sp_mem = load_taxonomy_counter(reftree=reftree, user_taxonomy_counter=args.user_taxonomy_counter)
+    # 4. Load or Generate Taxonomy Counter
+    level2sp_mem = load_taxonomy_counter(
+        ref_species_tree=ref_species_tree, 
+        user_counter_path=args.user_taxonomy_counter
+    )
 
-    return t, taxonomy_db, reftree, level2sp_mem
+    return gene_tree, taxonomy_db, ref_species_tree, level2sp_mem
 
 
-
-
-def load_gene_tree(tree_path, sp_delimitator ):
+def load_gene_tree(tree_path: Path, sp_delimitator: str) -> PhyloTree:
     """
-    Loads Gene Tree from file, resolves polytomies, and sets the species naming function.
+    Loads a gene tree, resolves polytomies, and sets the species naming function.
+    
+    Args:
+        tree_path (Path): Path to the newick tree file.
+        sp_delimitator (str): Character separating species ID from gene ID in leaf names.
+
+    Returns:
+        An ete4 PhyloTree object.
     """
-    sys.stdout.write(f"        - Load gene tree: {os.path.basename(tree_path)}\n")
+    print(f"        - Loading gene tree: {tree_path.name}")
+    try:
+        t = PhyloTree(str(tree_path))
+    except Exception as e:
+        print(f"ERROR: Could not parse the gene tree file at '{tree_path}'.\nDetails: {e}", file=sys.stderr)
+        sys.exit(1)
+        
+    # Resolving polytomies is a critical preprocessing step.
+    t.resolve_polytomy()
     
-    
-    t = PhyloTree(tree_path)
-    
-    # Resolving polytomies is critical step.
-    t.resolve_polytomy() 
-   
-    # Set the species naming function 
+    # Set the function to extract species names from leaves.
     t.set_species_naming_function(lambda node: node.name.split(sp_delimitator)[0])
 
     return t
 
 
-def load_taxonomy(taxonomy, user_taxonomy):
+def load_taxonomy(taxonomy_type: str, user_taxonomy_path: Path = None) -> TaxonomyDB:
     """
-    Loads taxonomy database (NCBI or GTDB) from local server or user file.
+    Loads the specified taxonomy database (NCBI or GTDB).
+
+    Args:
+        taxonomy_type (str): The type of taxonomy to load ('NCBI' or 'GTDB').
+        user_taxonomy_path (Path, optional): Path to a custom taxonomy file. Defaults to None.
+
+    Returns:
+        An initialized NCBITaxa or GTDBTaxa object.
     """
-    sys.stdout.write(f"        - Load taxonomy: {taxonomy}\n")
-
-    if taxonomy == 'NCBI':
-        # NCBITaxa automatically handles whether to use a custom file or default DB
-        taxonomy_db = NCBITaxa(user_taxonomy, memory=True)
-    elif taxonomy == 'GTDB':
-        
-        taxonomy_db = GTDBTaxa(user_taxonomy)
-    else:
-        raise ValueError(f"Unsupported taxonomy type: {taxonomy}")
-
-    return taxonomy_db
-
-
-def load_reftree(rtree_path, t, taxonomy_db):
-    """
-    Gets the reference species tree either from a user-provided file or generated 
-    from the gene tree's species set.
-    """
+    print(f"        - Loading taxonomy: {taxonomy_type}")
     
+    db_path = str(user_taxonomy_path) if user_taxonomy_path else None
+
+    if taxonomy_type == 'NCBI':
+        # NCBITaxa can handle a None path, using its default database.
+        return NCBITaxa(dbfile=db_path, memory=True)
+    elif taxonomy_type == 'GTDB':
+        return GTDBTaxa(dbfile=db_path)
+    else:
+        raise ValueError(f"Unsupported taxonomy type: {taxonomy_type}")
+
+
+def load_reftree(rtree_path: Path, gene_tree: PhyloTree, taxonomy_db: TaxonomyDB) -> PhyloTree:
+    """
+    Loads a reference species tree from a file or generates it from the gene tree.
+
+    Args:
+        rtree_path (Path): Path to a user-provided species tree file.
+        gene_tree (PhyloTree): The loaded gene tree.
+        taxonomy_db (TaxonomyDB): The initialized taxonomy database.
+
+    Returns:
+        The annotated reference species tree.
+    """
     if rtree_path:
-        sys.stdout.write("        - Load reftree: from user provided file\n")
-        
-        reftree = PhyloTree(rtree_path, parser=0) 
+        print("        - Loading reference tree: from user-provided file")
+        ref_tree = PhyloTree(newick=rtree_path)
     else:
-        sys.stdout.write("        - Load reftree: generated from gene tree\n")
-        reftree = get_reftree(t, taxonomy_db)
+        print("        - Loading reference tree: generating from gene tree species")
+        species_list = gene_tree.get_species()
+        ref_tree = taxonomy_db.get_topology(species_list)
 
-    # Annotate the species tree with tax IDs/names from the database
-    taxonomy_db.annotate_tree(reftree, taxid_attr="name")
-    
-    return reftree
+    # Annotate the tree with lineage and other info from the database.
+    taxonomy_db.annotate_tree(ref_tree, taxid_attr="name")
+    return ref_tree
 
 
-def get_reftree(t, taxonomy_db):
+def load_taxonomy_counter(ref_species_tree: PhyloTree, user_counter_path: Path = None) -> Dict[str, set]:
     """
-    Creates reference tree (species tree) from the species present in the gene tree.
-    """
-    
-    taxid_list = t.get_species() 
-    reftree = taxonomy_db.get_topology(taxid_list)
-    
-    return reftree
+    Loads a taxonomy counter from a file or generates it from the reference tree.
 
+    Args:
+        ref_species_tree (PhyloTree): The annotated reference species tree.
+        user_counter_path (Path, optional): Path to a user-provided JSON counter file.
 
-def load_taxonomy_counter(reftree, user_taxonomy_counter):
+    Returns:
+        A dictionary mapping each taxonomic level to a set of species.
     """
-    Gets the taxonomy counter (number of species per level) from a user file or 
-    generates it from the reference tree.
-    """
-    
-    if user_taxonomy_counter:
-        sys.stdout.write("        - Load taxonomy counter: from user file\n")
-
-        if isinstance(user_taxonomy_counter, dict):
-            
-            level2sp_mem = user_taxonomy_counter
-        else:
-            try:
-                with open(user_taxonomy_counter, 'r') as levels:
-                    level2sp_mem = json.load(levels)
-            except Exception as e:
-                sys.stderr.write(f"Error loading taxonomy counter JSON: {e}\n")
-                sys.exit(1)
+    if user_counter_path:
+        print("        - Loading taxonomy counter: from user file")
+        try:
+            with user_counter_path.open('r') as f:
+                # Convert list values back to sets after loading from JSON
+                json_data = json.load(f)
+                return {level: set(species) for level, species in json_data.items()}
+        except Exception as e:
+            print(f"ERROR: Could not load taxonomy counter from '{user_counter_path}'.\nDetails: {e}", file=sys.stderr)
+            sys.exit(1)
     else:
-        sys.stdout.write("        - Load taxonomy counter: generated from reference tree\n")
-        level2sp_mem = get_taxonomy_counter(reftree)
-
-    return level2sp_mem
+        print("        - Loading taxonomy counter: generating from reference tree")
+        return get_taxonomy_counter(ref_species_tree)
 
 
-def get_taxonomy_counter(reftree):
+def get_taxonomy_counter(ref_species_tree: PhyloTree) -> Dict[str, set]:
     """
-    Creates Taxonomy counter (taxonomic level mapped to set of species) from the reference tree.
-    """
+    Generates a taxonomy counter from an annotated reference species tree.
 
+    The counter maps each taxonomic level (e.g., a taxid or a rank name) to the
+    set of species belonging to it.
+
+    Args:
+        ref_species_tree (PhyloTree): An ete4 tree already annotated by a taxonomy DB.
+
+    Returns:
+        A dictionary mapping levels to sets of species names.
+    """
     level2sp_mem = defaultdict(set)
-    
-    for leaf in reftree:
+    for leaf in ref_species_tree:
+        # Check for both possible lineage attributes to be robust
+        lineage = leaf.props.get('lineage') or leaf.props.get('named_lineage')
         
-        # Determine which lineage attribute to use based on the leaf name type
-        if leaf.name.isdigit():
-            # If name is a taxid, use 'lineage' property
-            lin = leaf.props.get('lineage') 
-        else:
-            # If name is a species name (string), use 'named_lineage'
-            lin = leaf.props.get('named_lineage') 
-        
-        # Ensure lineage exists before iterating
-        if lin:
-            for tax in lin:
-                # Store taxid/name as string key, and the species name as a member
-                level2sp_mem[str(tax)].add(leaf.name) 
-    
+        if lineage:
+            for tax_level in lineage:
+                level2sp_mem[str(tax_level)].add(leaf.name)
+                
     return level2sp_mem

@@ -298,7 +298,7 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
             if lin_rareness < lineage_thr:
                 sp2remove.add(sp)
                 break
-    
+    print(sp2remove)
     return sp2remove
 
 def update_taxonomical_props(n, sp_in, taxonomy_db):

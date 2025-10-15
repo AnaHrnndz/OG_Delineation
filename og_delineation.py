@@ -4,11 +4,12 @@ import sys
 import os
 import argparse
 import warnings
-import pathlib
+from pathlib import Path
 
 from ogd.ogd_core import run_ogd 
 
-# Set recursion limit early for safety in tree traversal
+
+# Set a high recursion limit for deep phylogenetic tree traversal.
 sys.setrecursionlimit(10000)
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -23,9 +24,9 @@ def get_args():
     )
     
     # 1. Pipeline Control Arguments (Keep Required first)
-    parser.add_argument('--tree', dest='tree', required=True,
+    parser.add_argument('--tree', dest='tree', required=True, type=Path,
                         help="Input tree file path.")
-    parser.add_argument('--output_path', dest='out_path', required=True,
+    parser.add_argument('--output_path', dest='out_path', required=True, type=Path,
                         help="Output path for results.")
     
     # 2. Thresholds (Clean up the help text for better formatting)
@@ -85,11 +86,31 @@ def get_args():
 
 def main():
     """
-    Parses arguments and initiates the OGD pipeline execution.
+    Parses arguments, validates inputs, and runs the OGD pipeline.
     """
     args = get_args()
 
-    run_ogd(args)
+    try:
+        # --- Input Validation ---
+        if not args.tree.is_file():
+            raise FileNotFoundError(f"Input tree file not found: {args.tree}")
+
+        # --- Output Directory Creation ---
+        args.out_path.mkdir(parents=True, exist_ok=True)
+        
+        print("🚀 Starting OG Delineation pipeline...")
+        run_ogd(args)
+        print(f"✅ Pipeline finished successfully. Results are in: {args.out_path}")
+
+    except FileNotFoundError as e:
+        print(f"❌ ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {e}", file=sys.stderr)
+        # Optional: for debugging, you can re-raise the error to see the full traceback
+        # raise e
+        sys.exit(1)
+
 
 
 if __name__ == "__main__":

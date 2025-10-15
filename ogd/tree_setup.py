@@ -1,133 +1,159 @@
+# -*- coding: utf-8 -*-
+"""
+tree_setup.py - Pre-analysis steps for the gene tree.
+Includes rooting, taxonomic annotation, and internal node naming.
+"""
+
 import subprocess
-from ete4 import PhyloTree
-from typing import Any, Tuple, Set, Optional, Dict
-import ogd.utils as utils
-import os
 import sys
-import shutil 
+import shutil
+from pathlib import Path
+from typing import Tuple, Set, Any
 
+from ete4 import PhyloTree
+from ogd.new_utils import BaseTaxonomyHandler # --> Import the base handler for type hinting
 
+# --> Import specific utils functions for clarity
+from ogd.new_utils import make_name, get_depth, run_clean_properties, write_tree_for_minvar_rooting
 
-def run_setup(t, taxonomy_db, reftree, clean_name_tree, args, tmpdir):
+def run_setup(
+    t: PhyloTree, 
+    tax_handler: BaseTaxonomyHandler, 
+    args: Any, 
+    tmpdir: Path
+) -> Tuple[PhyloTree, Set[str], Set[str], int]:
     """
-    Preanalysis steps: rooting, taxonomy annotation, set up node properties, 
-    and name internal nodes.
+    Run all pre-analysis steps on the gene tree.
+
+    Args:
+        t (PhyloTree): The input gene tree object.
+        tax_handler (BaseTaxonomyHandler): The initialized taxonomy handler.
+        args (Any): The command-line arguments object.
+        tmpdir (Path): The path to the temporary directory.
+
+    Returns:
+        A tuple containing:
+        - The processed and annotated PhyloTree object.
+        - A set of all species in the tree.
+        - A set of all leaf names (members) in the tree.
+        - The total number of unique species.
     """
     
-    rooting = args.rooting
-    sp_delimitator = args.sp_delim
-    
+    # 1. Root the tree based on the user's chosen method.
+    t = run_rooting(t, args.rooting, tmpdir, args.sp_delim)
 
-    # 1. Rooting
-    t = run_rooting(t, rooting, tmpdir, sp_delimitator)
+    # 2. Add taxonomic annotations to all nodes using the handler.
+    t = add_taxomical_annotation(t, tax_handler)
 
-    # 2. Add Taxonomy Annotation (Do this first, as rooting/scores might need it)
-    t = add_taxomical_annotation(t, taxonomy_db)
-
-    # 3. Get original seqs and species set
+    # 3. Get original sequence and species sets *after* processing.
     total_mems_in_tree = set(t.leaf_names())
     set_sp_total = t.get_species()
     num_total_sp = len(set_sp_total)
 
-    # 4. Name internal nodes (using imported utils functions)
+    # 4. Name all internal nodes for unique identification.
     for i, n in enumerate(t.traverse()):
-        if not n.is_leaf:   
-            # Assuming make_name and get_depth were moved to utils
-            n.name = f"{utils.make_name(i)}-{utils.get_depth(n)}" 
+        if not n.is_leaf:
+            # Use utility functions to create a consistent, informative name.
+            n.name = f"{make_name(i)}-{get_depth(n)}"
     
-
-    # 5. Logging and Output
+    # 5. Clean special characters from annotations.
+    t, _ = run_clean_properties(t)
 
     print(f"""        - Total leaves: {len(t)}
-        - Total species: {num_total_sp}
-    """)
+        - Total species: {num_total_sp}""")
     
-    # 6. Clean properties and get Newick for later use
-    t, props = utils.run_clean_properties(t)
-
-    # Assuming get_newick now takes the tree and returns the string
-    tree_nw = utils.get_newick(t, props) 
-
-    return tree_nw, set_sp_total, total_mems_in_tree, num_total_sp
+    # --> Return the PhyloTree object directly instead of converting to newick
+    return t, set_sp_total, total_mems_in_tree, num_total_sp
 
 
-def run_rooting(t, rooting, tmpdir, sp_delimitator):
-    """
-    Applies tree rooting using Midpoint, MinVar, or no rooting.
-    """
-
-    if rooting == "Midpoint":
+def run_rooting(t: PhyloTree, rooting_method: str, tmpdir: Path, sp_delimitator: str) -> PhyloTree:
+    """Applies the specified rooting method to the tree."""
+    
+    if rooting_method == "Midpoint":
         try:
             root_mid = t.get_midpoint_outgroup()
-            t.set_outgroup(root_mid)
-            sys.stdout.write("        - Rooting: Midpoint successful.\n")
+            if root_mid:
+                t.set_outgroup(root_mid)
+                print("        - Rooting: Midpoint successful.")
+            else:
+                print("        - WARNING: Midpoint rooting failed (could not find midpoint). No rooting applied.", file=sys.stderr)
         except Exception as e:
-            sys.stderr.write(f"        - WARNING: Error during Midpoint rooting: {e}\n")
-            # Continue without rooting if it fails
-            sys.stdout.write("        - No rooting applied.\n")
+            print(f"        - WARNING: An error occurred during Midpoint rooting: {e}. No rooting applied.", file=sys.stderr)
 
-    elif rooting == "MinVar":
-        sys.stdout.write("        - Rooting: Running MinVar...\n")
+    elif rooting_method == "MinVar":
+        print("        - Rooting: Running MinVar...")
         t = run_minvar(t, tmpdir, sp_delimitator)
         
     else:
-        sys.stdout.write("        - No rooting applied.\n")
-    
+        print("        - No rooting applied.")
+        
     return t
 
 
-def run_minvar(t, tmpdir, sp_delimitator):
-    """
-    Executes external FastRoot.py for MinVar rooting.
-    """
+def run_minvar(t: PhyloTree, tmpdir: Path, sp_delimitator: str) -> PhyloTree:
+    """Executes the external FastRoot.py script for MinVar rooting."""
     
-    # 1. Locate FastRoot.py executable
+    # 1. Locate the FastRoot.py executable in the system's PATH.
     minvar_exec = shutil.which("FastRoot.py")
     if not minvar_exec:
-        sys.stderr.write("        - ERROR: FastRoot.py executable not found in PATH. Skipping MinVar rooting.\n")
+        print("        - ERROR: FastRoot.py executable not found in PATH. Skipping MinVar rooting.", file=sys.stderr)
         return t
 
-    # 2. Write the tree for MinVar input
-    input_tree_minvar = utils.write_tree_for_minvar_rootin(t, tmpdir)
-    path2tmptree = os.path.join(tmpdir, 'output_minvar_tree.nw')
-    stdout_file = os.path.join(tmpdir, 'minvar.stdout')
-    stderr_file = os.path.join(tmpdir, 'minvar.stderr')
+    # 2. Prepare input and output file paths using pathlib.
+    input_tree_path = write_tree_for_minvar_rooting(t, tmpdir)
+    output_tree_path = tmpdir / 'output_minvar_tree.nw'
+    stdout_log = tmpdir / 'minvar.stdout'
+    stderr_log = tmpdir / 'minvar.stderr'
 
-    # 3. Run MinVar using the safer list-form for subprocess.run
+    # 3. Construct and run the command.
+    command = [
+        sys.executable, str(minvar_exec),
+        "-i", str(input_tree_path),
+        "-o", str(output_tree_path)
+    ]
+    
     try:
-        with open(stdout_file, 'w') as stdout_f, open(stderr_file, 'w') as stderr_f:
+        with stdout_log.open('w') as stdout_f, stderr_log.open('w') as stderr_f:
             subprocess.run(
-                [sys.executable, minvar_exec, "-i", input_tree_minvar, "-o", path2tmptree],
-                check=True,  # Raise error if MinVar fails
+                command,
+                check=True,       # Raise an exception if the command fails
+                capture_output=False, # We are redirecting manually
                 stdout=stdout_f,
-                stderr=stderr_f,
-                text=True
+                stderr=stderr_f
             )
         
-        # 4. Open the rooted tree
-        t_minvar = PhyloTree(open(path2tmptree), parser=0)
+        # 4. Load the newly rooted tree.
+        t_minvar = PhyloTree(str(output_tree_path))
         t_minvar.set_species_naming_function(lambda node: node.name.split(sp_delimitator)[0])
-        ("        - MinVar rooting successful.\n")
+        print("        - MinVar rooting successful.")
         return t_minvar
 
-    except subprocess.CalledProcessError as e:
-        sys.stderr.write(f"        - FATAL ERROR: MinVar rooting failed (Non-zero exit code). Check logs in {tmpdir}. {e}\n")
-        # STOP EXECUTION
+    except FileNotFoundError:
+        print(f"        - ERROR: Could not find the MinVar output tree at '{output_tree_path}'.", file=sys.stderr)
+        return t # Return the original tree
+    except subprocess.CalledProcessError:
+        print(f"        - FATAL ERROR: MinVar rooting failed. Check logs in '{tmpdir}'.", file=sys.stderr)
         sys.exit(1)
-
     except Exception as e:
-        sys.stderr.write(f"        - FATAL ERROR: Failed to process MinVar output or load tree: {e}\n")
-        # STOP EXECUTION
+        print(f"        - FATAL ERROR: An unexpected error occurred during MinVar processing: {e}", file=sys.stderr)
         sys.exit(1)
 
 
-def add_taxomical_annotation(t, taxonomy_db):
+def add_taxomical_annotation(t: PhyloTree, tax_handler: BaseTaxonomyHandler) -> PhyloTree:
     """
-    Adds taxonomical annotation to nodes (sci_name, taxid, named_lineage, rank, etc.).
-    """
-    sys.stdout.write("        - Adding taxonomical annotations...\n")
+    Adds taxonomic annotations to tree nodes using the provided handler.
     
-    taxonomy_db.annotate_tree(t, taxid_attr="species") 
+    Args:
+        t (PhyloTree): The tree to be annotated.
+        tax_handler (BaseTaxonomyHandler): The taxonomy handler (NCBI or GTDB).
+
+    Returns:
+        The annotated PhyloTree object.
+    """
+    print("        - Adding taxonomical annotations...")
+    
+    # --> The handler's internal db object is used for the annotation.
+    # This keeps the core logic agnostic to the database type.
+    tax_handler.db.annotate_tree(t, taxid_attr="species")
     
     return t
-

@@ -1,6 +1,7 @@
 import ogd.utils as utils
 from ete4 import PhyloTree # t is assumed to be a PhyloTree
 from typing import Any, Tuple, Set, List, Dict
+from collections import defaultdict
 
 ## 4. Detect Duplications and Core-OGs & PGs ##
 
@@ -87,7 +88,10 @@ def run_get_main_dups(t, taxonomy_db, total_mems_in_tree, args):
     # 4. Final cleanup
     t, props = utils.run_clean_properties(t)
 
-    return t, taxid_dups_og
+    # 5. Build OG Indexes (NEW STEP)
+    og_indexes = _build_og_indexes(t) 
+
+    return t, taxid_dups_og, og_indexes
 
 
 
@@ -138,3 +142,33 @@ def _annotate_root_og(t):
     # If there are no monophyletic OGs sharing the root's LCA, the root is an OG.
     if not list(t.search_nodes(monophyletic_og='True', lca_node=lca_root)):
         t.add_prop('monophyletic_og', 'True')
+
+
+def _build_og_indexes(t) :
+    """
+    Builds indices for fast lookup of nodes based on key properties (monophyletic_og, evoltype_2, lca_node).
+    """
+    og_indexes = defaultdict(lambda: defaultdict(set))
+    
+    for node in t.traverse():
+        # 1. Index by Monophyletic OG status
+        monophyletic = node.props.get('monophyletic_og')
+        if monophyletic:
+            og_indexes['monophyletic_og'][monophyletic].add(node)
+            
+        # 2. Index by Evolutionary Type
+        evoltype = node.props.get('evoltype_2')
+        if evoltype:
+            og_indexes['evoltype_2'][evoltype].add(node)
+            
+        # 3. Index by LCA (Least Common Ancestor)
+        lca = node.props.get('lca_node')
+        if lca is not None:
+            # Note: LCA is critical for paraphyletic OG check
+            og_indexes['lca_node'][lca].add(node)
+            
+    # Convert defaultdicts to standard dicts for better structure/safety
+    return {
+        key: dict(sub_dict) 
+        for key, sub_dict in og_indexes.items()
+    }
