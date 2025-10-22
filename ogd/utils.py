@@ -1,243 +1,259 @@
+"""
+Utility functions for the Orthologous Group Delineation (OGD) pipeline.
+
+This module provides a collection of helper functions for tasks such as
+file system operations, string manipulation, tree processing, and interacting
+with taxonomy databases in a generic way.
+"""
+
+import argparse
+import json
+import logging
 import re
-from ete4 import PhyloTree
-from collections import defaultdict
+import tempfile
+from collections import Counter, OrderedDict
+from pathlib import Path
+from typing import Set, Union
 
-def parse_taxid(node):
+"""
+Utility functions for the Orthologous Group Delineation (OGD) pipeline.
 
-    return node.name.split('.')[0]
+This module provides a collection of helper functions for tasks such as
+file system operations, string manipulation, tree processing, and interacting
+with taxonomy databases in a generic way.
+"""
 
-def parse_taxid_gtdb(node):
+import argparse
+import json
+import logging
+import re
+import tempfile
+from collections import Counter, OrderedDict
+from pathlib import Path
+from typing import Set, Union
 
-    #TODO: add argument for split gen name
-    return node.name.split('@')[0]
+from ete4 import GTDBTaxa, NCBITaxa, PhyloTree
 
+# --- Type Aliases ---
+TaxonomyDB = Union[NCBITaxa, GTDBTaxa]
 
-def get_gtdb_rank(gtdb_code):
-    init_rank = gtdb_code.split('__')[0]
-    if init_rank == 'r_root':
-        rank = 'r_root'
-    elif init_rank == 'd':
-        rank = 'Domain'
-    elif init_rank == 'p':
-        rank = 'Phylum'
-    elif init_rank == 'c':
-        rank = 'Class'
-    elif init_rank == 'o':
-        rank = 'Order'
-    elif init_rank == 'f':
-        rank = 'Family'
-    elif init_rank == 'g':
-        rank = 'Genus'
-    elif init_rank == 's':
-        rank = 'Species'
-    else:
-        rank = 'Unk'
-
-    return rank
+# --- Constants ---
+# Used for generating unique names for internal nodes
+_NODE_NAME_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+# Node properties to sanitize before writing to Newick format
+_PROPERTIES_TO_SANITIZE = ["sci_name", "lca_node_name", "common_name"]
 
 
-def determine_so_threshold(taxonomy_db, lin_lca, args):
-    """
-    Determines the Species Overlap (SO) threshold to use based on the 
-    taxonomy type (NCBI or GTDB) and the ancestral lineage (lin_lca) of the LCA.
+# --- Classes ---
+
+class OrderedCounter(Counter, OrderedDict):
+    """A Counter that remembers the order elements are first seen."""
+    def __repr__(self):
+        return f'{self.__class__.__name__}({OrderedDict(self)!r})'
+
+    def __reduce__(self):
+        return self.__class__, (OrderedDict(self),)
+
+
     
+
+
+# --- File System and String Manipulation ---
+
+def create_temp_dir(output_path: Path) -> Path:
+    """
+    Creates a temporary directory for intermediate files.
+
+    Tries to create the directory within the specified output path. If it fails
+    (e.g., due to permissions), it falls back to the system's default temporary
+    directory.
+
     Args:
-        taxonomy_db: The taxonomy database object (e.g., NCBI Taxonomy object).
-        lin_lca: A list of tax IDs (int) or tax names (str) in the LCA lineage.
-        args: Object containing the SO thresholds (so_euk, so_bact, so_arq, so_all, etc.).
-        
+        output_path: The Path object for the main output directory.
+
     Returns:
-        The Species Overlap threshold (float) to use.
+        The Path object for the created temporary directory.
     """
-    
-    # 1. Initialize with the default threshold
-    so_to_use = args.so_all
+    try:
+        tmpdir = tempfile.mkdtemp(dir=output_path)
+        logging.info(f"Temporary directory created: {tmpdir}")
+    except OSError as e:
+        tmpdir = tempfile.mkdtemp(prefix="ogd_")
+        logging.warning(f"Could not create temp dir in '{output_path}'. Using system default: {tmpdir}. Reason: {e}")
+    return Path(tmpdir)
 
-    # Use the string representation to determine the taxonomy type
-    taxonomy_name = str(taxonomy_db).lower()
+def sanitize_string_for_newick(text: str) -> str:
+    """Removes characters that can break the Newick format and replaces spaces."""
+    if not isinstance(text, str):
+        return str(text)
+    # Remove problematic characters: ', [, ], =, -, :
+    sanitized = re.sub(r"['\[\]=\-:]", "", text)
+    # Replace spaces with underscores
+    return sanitized.replace(' ', '_')
 
-    # 2. Define search maps for tax IDs/names to SO arguments
-    
-    # Map for NCBI Taxonomy (Tax IDs)
-    NCBI_MAP = {
-        2759: args.so_euk,   # Eukaryota
-        2:    args.so_bact,   # Bacteria
-        2157: args.so_arq    # Archaea
-    }
-
-    # Map for GTDB Taxonomy (Domain names)
-    GTDB_MAP = {
-        'd__Bacteria': args.so_bact,
-        'd__Archaea': args.so_arq,
-        'root': args.so_all 
-    }
-
-    # 3. Selection logic based on taxonomy database
-    
-    if 'ncbi_taxonomy' in taxonomy_name:
-        
-        # Iterate over the NCBI map to find the most specific available threshold
-        for tax_id, so_threshold in NCBI_MAP.items():
-            
-            # Condition: User provided the threshold AND the tax_id is in the lineage
-            if so_threshold is not None and tax_id in lin_lca:
-                so_to_use = so_threshold
-                break 
-
-    elif 'gtdb_taxonomy' in taxonomy_name:
-        
-        # Iterate over the GTDB map to find the matching threshold
-        for tax_name, so_threshold in GTDB_MAP.items():
-            if tax_name in lin_lca:
-                so_to_use = so_threshold
-                break
-                
-        # Handle the special case 'Empty' for GTDB
-        if so_to_use == args.so_all and 'Empty' in lin_lca:
-            so_to_use = 0.0
-
-    return so_to_use
-
-
-def get_newick(t, all_props):
-
+def remove_file_extension(filename: str) -> str:
     """
-        Return tree in newick format with annotations
+    Removes known extensions from a filename string, handling multiple extensions.
     """
-
-    t = t.write(props=all_props, format_root_node=True)
-    return t
-
-
-def run_clean_properties(tree):
-
-    # 1. Input Handling: Ensure the input is a PhyloTree object
-    if isinstance(tree, str):
-        
-        t = PhyloTree(tree)
-    else:
-        t = tree 
-
-    
-    PROPERTIES_TO_CLEAN = ["sci_name", "lca_node_name", "common_name"]
-    
-    all_prop_keys= set()
-
-    # 2. Traverse and Clean Properties
-    for node in t.traverse():
-        # Update the set of all property keys present in the tree
-        all_prop_keys.update(node.props.keys())
-        
-        # Iterate only through the required properties to clean
-        for prop_name in PROPERTIES_TO_CLEAN:
-            # Check if the property exists and is not None
-            prop_value = node.props.get(prop_name)
-            
-            if prop_value:
-                # Apply the cleaning function and update the property value
-                node.props[prop_name] = clean_string(prop_value)
-
-    return t, all_prop_keys
+    p = Path(filename)
+    # Sequentially remove suffixes until no known extension is found
+    while p.suffix in {'.gz', '.bz2', '.zip', '.faa', '.nw', '.fa', '.fasta'}:
+        p = p.with_suffix('')
+    return p.name
 
 
-def clean_string(string):
-    
-    clean_string = re.sub(r"'|\[|\]|\=|\-|\:", "", string)
-    return clean_string.replace(' ', '_') 
+# --- Taxonomy Abstraction ---
 
+def is_gtdb(tax_db: TaxonomyDB) -> bool:
+    """Checks if the provided taxonomy database is GTDB."""
+    return isinstance(tax_db, GTDBTaxa)
 
-def remove_file_extension(name):
-    
-    extensions = ['.faa', '.nw', '.fa', '.fasta']
-    
-    removed = True
-    while removed:
-        removed = False
-        for ext in extensions:
-           
-            if name.endswith(ext):
-               
-                name = name.removesuffix(ext)
-                removed = True
-               
-                
-    return name[:len(name)]
+def get_scientific_name(tax_db: TaxonomyDB, taxid: Union[int, str]) -> str:
+    """Gets the scientific name for a given taxid, abstracting the db type."""
+    if is_gtdb(tax_db):
+        return str(taxid)
+    return tax_db.get_taxid_translator([int(taxid)])[int(taxid)]
 
+def get_rank(tax_db: TaxonomyDB, taxid: Union[int, str]) -> str:
+    """Gets the rank for a given taxid, abstracting the db type."""
+    if is_gtdb(tax_db):
+        rank_code = str(taxid).split('__')[0]
+        rank_map = {
+            'd': 'Domain', 'p': 'Phylum', 'c': 'Class', 'o': 'Order',
+            'f': 'Family', 'g': 'Genus', 's': 'Species', 'r_root': 'root'
+        }
+        return rank_map.get(rank_code, 'Unknown')
+    raw_rank = tax_db.get_rank([int(taxid)])[int(taxid)]
+    return sanitize_string_for_newick(raw_rank)
 
-
-def run_write_post_tree(t, clean_name_tree, path_out, all_props):
-
+def get_lca_node(species_set: Set[str], tax_db: TaxonomyDB) -> str:
     """
-        Write newick file after the analysis
-        
+    Finds the Last Common Ancestor (LCA) for a given set of species taxids.
     """
+    if not species_set:
+        return 'Unk'
+
+    # Count occurrences of each taxon in all lineages
+    lineage_counts = OrderedCounter()
+    for species_id in species_set:
+        lineage = get_lineage(tax_db, species_id) 
+        if lineage:
+            lineage_counts.update(lineage)
+
+    # The LCA is the most recent (last) taxon present in ALL lineages
+    num_species = len(species_set)
+    lca_candidates = [taxon for taxon, count in lineage_counts.items() if count == num_species]
     
+    return lca_candidates[-1] if lca_candidates else 'Unk'
 
-    post_tree_path = path_out+'/'+clean_name_tree+'.tree_annot.nw'
-    t.write(outfile=post_tree_path, props=all_props, format_root_node = True)
-
-    return post_tree_path
-
-
-def write_tree_for_minvar_rootin(t, tmpdir):
-
-    input_tree_minvar = tmpdir+'input_tree_minvar.nw'
-    t.write(outfile=input_tree_minvar, format_root_node = True)
-
-    return input_tree_minvar
-
-
-
-def get_sci_name(taxonomy_db, taxa):
-
-    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-        sci_name_taxa =  taxonomy_db.get_taxid_translator([taxa])[int(taxa)]
-    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
-        sci_name_taxa = taxa
-
-    return sci_name_taxa
 
 
 def get_lineage(taxonomy_db, taxid):
-    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+    if 'ncbi_taxonomy' in str(taxonomy_db):
         lin = taxonomy_db.get_lineage(taxid)
+        
             
-    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
-        if lca_tree != 'r_root':
-            lin =  taxonomy_db.get_name_lineage([taxid])[0][taxid]
+    elif 'gtdb_taxonomy' in str(taxonomy_db) : 
+        #if lca_tree != 'r_root':
+        lin =  taxonomy_db.get_name_lineage([taxid])[0][taxid]
 
+    
     return lin
 
+def update_sp_per_level_in_node(sp_per_level_in_node, taxonomy_db, l):
 
-def get_rank(taxonomy_db, taxid):
-    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-        rank = clean_string(taxonomy_db.get_rank([taxid])[taxid])
+    
+    if 'ncbi_taxonomy' in str(taxonomy_db):
+        
+        for tax in l.props.get('lineage'):
+            sp_per_level_in_node[tax].add(l.props.get('taxid'))
 
-    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
-        rank = get_gtdb_rank(taxid)
+    elif 'gtdb_taxonomy' in str(taxonomy_db): 
+        for tax in l.props.get('named_lineage'):
+            sp_per_level_in_node[tax].add((l.props.get('taxid')))
 
-    return rank
-
-
+    
 def get_lca_node_name(taxonomy_db, taxid):
-    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+    if 'ncbi_taxonomy' in str(taxonomy_db):
         lca_node_name = taxonomy_db.get_taxid_translator([taxid])[taxid]
 
-    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy':
+    elif 'gtdb_taxonomy' in str(taxonomy_db): 
         lca_node_name = lca_node
 
 
     return lca_node_name
 
+# --- Tree Processing ---
 
-def update_sp_per_level_in_node(sp_per_level_in_node, taxonomy_db, l):
+def generate_internal_node_name(counter: int) -> str:
+    """
+    Creates a unique, short name for an internal node based on a counter.
+    Example: 0->A, 1->B, 51->Z, 52->BA
+    """
+    if counter < 0: return ""
+    name = ''
+    i = counter
+    while True:
+        name = _NODE_NAME_CHARS[i % len(_NODE_NAME_CHARS)] + name
+        i //= len(_NODE_NAME_CHARS)
+        if i == 0: break
+        i -= 1
+    return name
 
+
+def get_node_depth(node):
+
+    """
+        Get depth of internal nodes
+        Depth = number nodes from root node to target node
+    """
+    depth = 0
+    while node is not None:
+        depth += 1
+        node = node.up
+    return depth
+
+
+def sanitize_tree_properties(tree: Union[PhyloTree, str]) -> tuple[PhyloTree, Set[str]]:
+    """
+    Cleans specific node properties in a tree to ensure Newick compatibility.
+    """
+    phylo_tree = tree if isinstance(tree, PhyloTree) else PhyloTree(tree)
     
-    if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
-        for tax in l.props.get('lineage').split('|'):
-            sp_per_level_in_node[tax].add(str(l.props.get('taxid')))
-    elif (str(taxonomy_db).split('.')[1]) == 'gtdb_taxonomy': 
-        for tax in l.props.get('named_lineage').split('|'):
-            sp_per_level_in_node[tax].add(str(l.props.get('taxid')))
+    all_prop_keys = set()
+    for node in phylo_tree.traverse():
+        all_prop_keys.update(node.props.keys())
+        for prop_name in _PROPERTIES_TO_SANITIZE:
+            if prop_value := node.props.get(prop_name):
+                node.props[prop_name] = sanitize_string_for_newick(prop_value)
 
+    return phylo_tree, all_prop_keys
+
+def write_annotated_tree(tree: PhyloTree, output_dir: Path, filename_base: str, props: Set[str]) -> Path:
+    """
+    Writes the final annotated tree to a Newick file.
+    """
+    output_path = output_dir / f"{filename_base}.tree_annot.nw"
+    # Convert props set to list for ete4 compatibility
+    tree.write(outfile=str(output_path), props=list(props), format_root_node=True)
+    logging.info(f"Annotated tree written to: {output_path}")
+    return output_path
+
+
+# --- Algorithm-specific Helpers ---
+
+def determine_so_threshold(tax_db: TaxonomyDB, lineage: list, args: argparse.Namespace) -> float:
+    """
+    Determines the Species Overlap (SO) threshold based on the node's lineage.
+    """
+    lineage_set = set(lineage)
     
+    if is_gtdb(tax_db):
+        if args.so_bact is not None and 'd__Bacteria' in lineage_set: return args.so_bact
+        if args.so_arq is not None and 'd__Archaea' in lineage_set: return args.so_arq
+    else: # NCBI
+        if args.so_euk is not None and 2759 in lineage_set: return args.so_euk
+        if args.so_bact is not None and 2 in lineage_set: return args.so_bact
+        if args.so_arq is not None and 2157 in lineage_set: return args.so_arq
+            
+    return args.so_all

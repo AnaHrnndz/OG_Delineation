@@ -5,18 +5,8 @@ import ogd.utils as utils
 
 
 
-class OrderedCounter(Counter, OrderedDict):
-     'Counter that remembers the order elements are first seen'
-     def __repr__(self):
-         return '%s(%r)' % (self.__class__.__name__,
-                            OrderedDict(self))
-     def __reduce__(self):
-         return self.__class__, (OrderedDict(self),)
-
-
-
 ##  3. Outliers and Scores
-def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args):
+def run_outliers_and_scores(t, taxonomy_db, num_total_sp, level2sp_mem, args):
 
     mssg = f"""
     2. Detect outlierts and get scores:
@@ -26,7 +16,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
         -Species losses percentage threshold: {args.sp_loss_perc}"""
     print(mssg)
 
-    t = PhyloTree(t_nw, parser = 0)
+    #t = PhyloTree(t_nw, parser = 0)
 
     CONTENT = t.get_cached_content()
    
@@ -42,7 +32,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
 
     for n in t.traverse("preorder"):
 
-        if (str(taxonomy_db).split('.')[1]) == 'ncbi_taxonomy':
+        if 'ncbi_taxonomy' in str(taxonomy_db):
             n.del_prop('named_lineage')
         
         n.del_prop('_speciesFunction')
@@ -51,6 +41,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             n.add_prop('lca_node', n.props.get('taxid'))
 
         else:
+            
             n.add_prop('old_lca_name',(n.props.get('sci_name')))
 
             #DETECT OUTLIERS
@@ -60,17 +51,18 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             leaves_in = set()
             
             #Add outliers from upper nodes
-            if args.inherit_out == 'Yes':
+            if args.inherit_outliers == 'Yes':
                 sp_out_inherit = add_upper_outliers(n, CONTENT)
                 sp_out.update(sp_out_inherit)
 
             
-
+            
             # Call outlierts detection and update the set with the species taxid that are outliers
             sp_out.update(outliers_detection(n, args.lineage_thr, args.best_tax_thr, CONTENT, level2sp_mem, sp_out, taxonomy_db))
+            if n.name == 'A-1':
+                print(sp_out)
 
-            
-            #   Detect outliers
+#   Detect outliers
             ch1 = n.children[0]
             ch2 = n.children[1]
             
@@ -91,7 +83,7 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
                     leaves_out.add(l.props.get('name'))
 
                 # Leaves that are outliers have the prop called "taxo_outlier"
-                elif  str(l.props.get('taxid')) in sp_out:
+                elif  int(l.props.get('taxid')) in sp_out:
                     leaves_out.add(l.props.get('name'))
                     l.add_prop('taxo_outlier', 'true')
 
@@ -180,8 +172,10 @@ def run_outliers_and_scores(t_nw, taxonomy_db, num_total_sp, level2sp_mem, args)
             else:
                 n.add_prop('evoltype_2', 'S')
 
-    t, props = utils.run_clean_properties(t)
+    
+    t, props = utils.sanitize_tree_properties(t)
 
+    
     return t, CONTENT, total_outliers
 
 
@@ -246,7 +240,7 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
                 lin_in_tree
     """
 
-
+    
     sp_in_node = set()
 
     """
@@ -259,7 +253,8 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
         if l.props.get('taxid') not in sp_out_up:
             sp_in_node.add(l.props.get('taxid'))
             utils.update_sp_per_level_in_node(sp_per_level_in_node, taxonomy_db, l)
-            
+
+   
     """
     Select best taxonomic level for the node. 
     Best level its the most recent level that grouped >90% sp in the node
@@ -269,13 +264,15 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
     best_tax = str()
     ptax = defaultdict(dict)
     
-    for tax, num in sp_per_level_in_node.items():
+    for tax, sp_list in sp_per_level_in_node.items():
         
+        n_sp_list = len(sp_list)
         depth_tax = len(utils.get_lineage(taxonomy_db, tax))
 
-        perc_tax_in_node = len(num)/len(sp_in_node)
+        perc_tax_in_node = n_sp_list/len(sp_in_node)
         ptax[depth_tax][tax] = perc_tax_in_node
-
+        
+    
 
     """
     Once that I have the depth of all the lineages, sort the list in reverse 
@@ -290,17 +287,19 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
     for depth in depths_list:
         for tax, perc in ptax[depth].items():
             if perc >=best_tax_thr:
-                best_tax = str(tax)
+                best_tax = (tax)
                 best_depth = depth
                 break
         if best_tax != '':
             break
 
+    
     if best_depth in ptax.keys():
-        n.add_prop('best_tax', best_tax+'_'+str(ptax[best_depth][best_tax]))
+        n.add_prop('best_tax', str(best_tax)+'_'+str(ptax[best_depth][best_tax]))
     else:
         n.add_prop('best_tax', 'NO LEAVES')
 
+   
     best_tax_lineage =  utils.get_lineage(taxonomy_db, best_tax)
    
     # For the sp that do not belong to the best_tax level, check if are outliers or not
@@ -338,7 +337,7 @@ def update_taxonomical_props(n, sp_in, taxonomy_db):
     """
 
     if len(sp_in) > 0:
-        lca_node = get_lca_node(sp_in, taxonomy_db)
+        lca_node = utils.get_lca_node(sp_in, taxonomy_db)
         
         if lca_node == 'r_root':
             lin_lca = ['r_root']
@@ -367,26 +366,6 @@ def update_taxonomical_props(n, sp_in, taxonomy_db):
         n.props['sci_name'] = n.props.get('Empty')
 
 
-def get_lca_node(sp_list, taxonomy_db):
-
-    """
-        Get Last Common Ancestor (lca) from a set of species
-    """
-
-    lineages = OrderedCounter()
-    nspecies = 0
-    for sp in sp_list:
-        nspecies += 1
-
-        lineages.update(utils.get_lineage(taxonomy_db, sp))
-
-    lca = [l for l, count in lineages.items() if count == nspecies]
-    
-    if not lca:
-        lca = ['Unk']
-
-    
-    return lca[-1]
 
 
 def get_inparalogs_rate(sp_in):

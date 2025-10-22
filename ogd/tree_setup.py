@@ -1,169 +1,167 @@
+"""
+Performs the initial setup and preprocessing of the phylogenetic tree.
+
+This module is responsible for critical initial steps such as rooting the tree,
+annotating it with taxonomic information, and preparing the nodes for
+subsequent analysis.
+"""
+
+import argparse
+import logging
+import shutil
 import subprocess
-from ete4 import  PhyloTree, GTDBTaxa
-import ogd.utils as utils
-import re
-import sys
-sys.setrecursionlimit(10000)
-## 2. Preanalysis - Tree setup  ##
+from pathlib import Path
+from typing import Set, Tuple
 
-chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+from ete4 import PhyloTree
 
-def run_setup(t, name_tree, taxonomy_db, path_out, tmpdir, args):
+# Local application imports
+from ogd.utils import (TaxonomyDB, generate_internal_node_name, get_node_depth,
+                       sanitize_tree_properties)
 
 
+
+# --- Main Setup Function ---
+
+def run_setup(
+    tree: PhyloTree,
+    tax_db: TaxonomyDB,
+    tmpdir: Path,
+    args: argparse.Namespace
+) -> Tuple[PhyloTree, Set[str], Set[str], int]:
     """
-        Preanalysis include several steps:
-            
-            rooting: Midpoint o MinVar
-            add taxonomy annotation
-            Get original seqs and species in the tree
-            Name internal nodes
+    Executes the entire tree preprocessing pipeline.
+
+    This includes:
+    1. Resolving polytomies.
+    2. Rooting the tree.
+    3. Annotating nodes with taxonomy.
+    4. Naming all internal nodes uniquely.
+
+    Args:
+        tree: The initial PhyloTree object loaded from the input file.
+        tax_db: The initialized taxonomy database.
+        tmpdir: Path to the temporary directory.
+        args: The parsed command-line arguments.
+
+    Returns:
+        A tuple containing:
+        - The fully processed and annotated PhyloTree object.
+        - A set of all species names found in the tree.
+        - A set of all leaf names (members) in the tree.
+        - The total count of unique species.
     """
-
-    rooting = args.rooting
-
-    sp_delimitator = args.sp_delim
+    # 1. Resolve polytomies (essential for many downstream analyses)
+    tree.resolve_polytomy()
     
-    t = run_rooting(t, rooting, tmpdir, sp_delimitator)
+    # 2. Apply the chosen rooting method
+    tree = _apply_rooting(tree, args.rooting, tmpdir, args.sp_delim)
 
-    t = add_taxomical_annotation(t, taxonomy_db)
-   
-    # Total members(leafs name) in tree
-    total_mems_in_tree = set(t.leaf_names())
-
-    #Create an ID for each internal node
-    for i, n in enumerate(t.traverse()):
-        if not n.is_leaf:   
-            n.name = '%s-%d' % (make_name(i), get_depth(n))
-
-    set_sp_total = t.get_species()
-    num_total_sp = len(set_sp_total)
-
-    mssg = f"""
-    1. Pre-analysis
-        -Rooting: {rooting}
-        -Len tree: {len(t)}
-        -Total species in tree: {num_total_sp}"""
-    print(mssg)
+    # 3. Annotate the entire tree with taxonomic information
+    tax_db.annotate_tree(tree, taxid_attr="species")
     
+    # 4. Get total leaf (member) and species counts
+    total_members_in_tree = set(tree.leaf_names())
+    species_set = tree.get_species()
+    total_species_count = len(species_set)
 
-    # Newick format need for web
-    t, props = utils.run_clean_properties(t)
-    tree_nw = utils.get_newick(t, props)
+    # 5. Assign a unique, readable name to each internal node
+    logging.info("Assigning names to internal nodes...")
+    for i, node in enumerate(tree.traverse()):
+        if not node.is_leaf:
+            # Name combines a generated ID and the node's depth
+            node.name = f"{generate_internal_node_name(i)}-{get_node_depth(node)}"
 
-    return tree_nw, set_sp_total, total_mems_in_tree, num_total_sp
-
-
-
-# def check_branch_legth(t):
-
-   
-    # lenghts = list()
-    # for n in t.traverse():
-        # if n.dist != None:
-            # lenghts.append(n.dist)
-            # if n.dist == 0.0:
-                # print (len(n), n.dist)
-        
-
-    # if (all(v == 0.0 for v in lenghts)) == True:
-        # for n in t.traverse():
-            # if n.dist != None:
-                # n.dist = 1.0
-            # else:
-                # print(len(n))
-
-    # return t
+    logging.info(f"Tree setup complete. Rooting: {args.rooting}, "
+                 f"Leaves: {len(total_members_in_tree)}, Species: {total_species_count}")
+    
+    # Return the processed PhyloTree OBJECT, not a string representation.
+    return tree, species_set, total_members_in_tree, total_species_count
 
 
-def run_rooting(t, rooting, tmpdir, sp_delimitator):
-
+def _run_minvar(tree: PhyloTree, tmpdir: Path, species_delimiter: str) -> PhyloTree:
     """
-        Tree rooting.
-        Midpoint or MinVar methods availables
-    """
+    Roots a tree using the external FastRoot.py (MinVar) tool.
 
-    if  rooting == "Midpoint":
-        root_mid = t.get_midpoint_outgroup()
+    This involves writing the tree to a temporary file, running the external
+    script, and then reading the resulting rooted tree back into memory.
+
+    Args:
+        tree: The PhyloTree object to be rooted.
+        tmpdir: The temporary directory for intermediate files.
+        species_delimiter: Delimiter to correctly parse species from leaf names
+                           in the re-loaded tree.
+
+    Returns:
+        A new, rooted PhyloTree object.
+    """
+    # 1. Find the FastRoot.py executable
+    fastroot_path = shutil.which('FastRoot.py')
+    if not fastroot_path:
+        logging.error("FastRoot.py not found in system PATH. Cannot perform MinVar rooting.")
+        raise FileNotFoundError("FastRoot.py is required for MinVar rooting.")
+
+    # 2. Define temporary file paths
+    input_tree_path = tmpdir / "minvar_input.nw"
+    output_tree_path = tmpdir / "minvar_output.nw"
+    stdout_log = tmpdir / "minvar.stdout"
+    stderr_log = tmpdir / "minvar.stderr"
+
+    # 3. Write the unrooted tree to a file
+    tree.write(outfile=str(input_tree_path), format_root_node=True)
+
+    # 4. Build and run the command safely
+    command = ["python3", fastroot_path, "-i", str(input_tree_path), "-o", str(output_tree_path)]
+    
+    logging.info(f"Running MinVar rooting with command: {' '.join(command)}")
+    try:
+        with open(stdout_log, 'w') as f_out, open(stderr_log, 'w') as f_err:
+            subprocess.run(
+                command, 
+                shell=False,  # shell=False is safer
+                check=True,   # Raises an exception if the command fails
+                stdout=f_out, 
+                stderr=f_err
+            )
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        logging.error(f"MinVar rooting failed. Check logs in {tmpdir}. Error: {e}")
+        # Return the original tree as a fallback
+        return tree
+
+    # 5. Load the newly rooted tree
+    rooted_tree = PhyloTree(str(output_tree_path))
+    rooted_tree.set_species_naming_function(lambda node: node.name.split(species_delimiter)[0])
+    return rooted_tree
+
+
+def _apply_rooting(tree: PhyloTree, method: str, tmpdir: Path, species_delimiter: str) -> PhyloTree:
+    """
+    Roots a tree using one of the available methods.
+
+    Args:
+        tree: The PhyloTree object to root.
+        method: The rooting method ('Midpoint' or 'MinVar').
+        tmpdir: Temporary directory, required for MinVar.
+        species_delimiter: Delimiter for species names, required for MinVar.
+
+    Returns:
+        The rooted PhyloTree object.
+    """
+    logging.info(f"Applying '{method}' rooting...")
+    if method == "Midpoint":
         try:
-            t.set_outgroup(root_mid)
-        except:
-            print('Error in Midpoint')
-
-    elif rooting == "MinVar":
-        
-        t = run_minvar(t, tmpdir, sp_delimitator)
-        
-
+            midpoint = tree.get_midpoint_outgroup()
+            if midpoint:
+                tree.set_outgroup(midpoint)
+            else:
+                logging.warning("Could not find a midpoint for rooting. Tree remains unrooted.")
+        except Exception as e:
+            logging.error(f"Midpoint rooting failed with an exception: {e}")
+    
+    elif method == "MinVar":
+        tree = _run_minvar(tree, tmpdir, species_delimiter)
+    
     else:
-        print('No rooting')
-    
-    return t
-
-
-def run_minvar(t, tmpdir, sp_delimitator):
-
-    """
-        With MinVar rooting, you need to :
-        1. Write the tree, polytomies had been resolved in previous step
-        2. Run MinVar
-        3. Open it again with PhyloTree
-    
-    """
-   
-    
-    input_tree_minvar = utils.write_tree_for_minvar_rootin(t, tmpdir)
-    path2tree = input_tree_minvar
-    path2tmptree = tmpdir+'output_minvar_tree.nw'
-    stdout_file = open(tmpdir+'minvar.stdout', 'w')
-    stderr_file = open(tmpdir+'minvar.stderr', 'w')
-
-    subprocess.run(("python3  $(which FastRoot.py) -i %s -o %s" \
-        %(path2tree, path2tmptree)), shell = True, stdout = stdout_file, stderr= stderr_file)
-    
-    stdout_file.close()
-    stderr_file.close()
-
-    t_minvar = PhyloTree(open(path2tmptree), parser = 0)
-
-    t_minvar.set_species_naming_function(lambda node: node.name.split(sp_delimitator)[0])
-
-    return t_minvar
-
-
-def add_taxomical_annotation(t, taxonomy_db):
-
-    """
-        Add taxonomical annotation to nodes (sci_name, taxid, named_lineage, lineage, rank)
-        Parsing function used to extract species name from a node’s name.
-    """
-    
-    taxonomy_db.annotate_tree(t,  taxid_attr="species") 
-    
-    return t
-
-
-def make_name(i):
-
-    """
-        Create names for internal nodes
-    """
-
-    name = ''
-    while i >= 0:
-        name = chars[i % len(chars)] + name
-        i = i // len(chars) - 1
-    return name
-
-
-def get_depth(node):
-
-    """
-        Get depth of internal nodes
-        Depth = number nodes from root node to target node
-    """
-    depth = 0
-    while node is not None:
-        depth += 1
-        node = node.up
-    return depth
+        logging.warning(f"No valid rooting method specified ('{method}'). Tree will not be rooted.")
+        
+    return tree
