@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """
 OGD: Orthologous Group Delineation Pipeline
-
-This script serves as the main entry point for the OGD pipeline.
-It parses command-line arguments and calls the core pipeline function.
 """
 
 import sys
 import argparse
 import warnings
-from pathlib import Path
 import logging
+from pathlib import Path
+import traceback
+from ete4 import Tree
 
 # Local application import for the main pipeline logic
 from ogd.ogd_core import run_ogd_pipeline
 
 # --- Global Configuration ---
 
-# Set a high recursion limit for deep phylogenetic tree traversal.
+# Set a high recursion limit for deep phylogenetic tree traversal
 sys.setrecursionlimit(10000)
 
-# Suppress common runtime warnings from scientific libraries.
+# Suppress common runtime warnings from scientific libraries
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # Configure basic logging for user feedback
+# The format ensures all messages are clear and timestamped.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 # --- Argument Parsing ---
@@ -74,7 +74,7 @@ def get_args() -> argparse.Namespace:
                         help="Threshold for LCA annotation confidence (default: 0.9).")
     params.add_argument('--species_losses_perct', dest='sp_loss_perc', default=0.7, type=float,
                         help="Threshold for species loss percentage (default: 0.7).")
-    params.add_argument('--no_inherit_outliers', dest='inherit_outliers', action='store_false',
+    params.add_argument('--no_inherit_outliers',  action='store_true',
                         help="Flag to prevent outliers from being inherited by parent nodes.")
     
     # --- Tree Processing Options ---
@@ -102,39 +102,90 @@ def get_args() -> argparse.Namespace:
                          help="Skip the generation of the ortholog pairs table.")
     modules.add_argument('--open_visualization', action='store_true',
                          help="Automatically open the ETE smart view GUI after analysis.")
+    modules.add_argument('--only_visualization', action='store_true',
+                         help="Automatically open the ETE smart view GUI after analysis.")
 
     return parser.parse_args()
 
+def _validate_args(args: argparse.Namespace):
+    """
+    Validates that all required files and dependent arguments are logical.
+    Raises FileNotFoundError or ValueError if a check fails.
+    """
+    logging.info("Validating input arguments...")
+    if not args.tree.is_file():
+        raise FileNotFoundError(f"Input tree file not found: {args.tree}")
+
+    # --- Check dependencies for optional modules ---
+    alignment_needed = args.run_recovery or args.run_emapper
+    
+    if alignment_needed and not args.alg:
+        raise ValueError("--run_recovery or --run_emapper requires --raw_alg to be set.")
+    
+    if args.alg and not args.alg.is_file():
+        raise FileNotFoundError(f"Alignment file not found: {args.alg}")
+
+    # --- Check emapper dependencies ---
+    if args.run_emapper:
+        if not args.emapper_dmnd or not args.emapper_pfam:
+            raise ValueError("--run_emapper requires --emapper_dmnd_db and --emapper_pfam_db.")
+        if not args.emapper_dmnd.is_file():
+            raise FileNotFoundError(f"Emapper diamond DB not found: {args.emapper_dmnd}")
+        if not args.emapper_pfam.is_file():
+            raise FileNotFoundError(f"Emapper Pfam DB not found: {args.emapper_pfam}")
+
+    # --- Check pre-computed emapper dependencies ---
+    if args.path2emapper_main or args.path2emapper_pfams:
+        if not (args.path2emapper_main and args.path2emapper_pfams):
+            raise ValueError("Both --path2emapper_main and --path2emapper_pfams must be provided together.")
+        if not args.path2emapper_main.is_file():
+            raise FileNotFoundError(f"Emapper main table not found: {args.path2emapper_main}")
+        if not args.path2emapper_pfams.is_file():
+            raise FileNotFoundError(f"Emapper Pfam table not found: {args.path2emapper_pfams}")
+
+    logging.info("Arguments validated successfully.")
 
 # --- Main Execution ---
 
 def main():
-    """Parses arguments and executes the OGD pipeline."""
+    """Parses arguments, validates them, and executes the OGD pipeline."""
     args = get_args()
     
     try:
-        # --- Input Validation ---
-        if not args.tree.is_file():
-            raise FileNotFoundError(f"Input tree file not found: {args.tree}")
+        # --- 1. Argument Validation ---
+        _validate_args(args)
 
-        # --- Output Directory Creation ---
+        # --- 2. Output Directory Creation ---
         args.out_path.mkdir(parents=True, exist_ok=True)
         
-        print("\n🚀 Starting OG Delineation pipeline...")
-        run_ogd_pipeline(args)
-        print(f"✅ Pipeline finished successfully. Results are in: {args.out_path}\n")
+        if args.only_visualization:
+            from ogd.run_ete4_smartview import run_smartview
+            processed_tree = Tree(open(args.tree))
+            alignment_path = str(args.alg) if args.alg else None
+            run_smartview(processed_tree, alignment_path)
+            sys.exit(1)
+            
 
-    except FileNotFoundError as e:
-        print(f"❌ ERROR: {e}", file=sys.stderr)
+        # --- 3. Run Pipeline ---
+        # Unified logging for pipeline status
+        logging.info("\n🚀 Starting OG Delineation pipeline...")
+        run_ogd_pipeline(args)
+        logging.info(f"\n✅ Pipeline finished successfully. Results are in: {args.out_path}\n")
+
+    except (FileNotFoundError, ValueError) as e:
+        # Errors related to configuration or missing files
+        logging.error(f"❌ CONFIGURATION ERROR: {e}")
+        sys.exit(1)
+    except OSError as e:
+        # Errors related to file system operations (e.g., creating directory)
+        logging.error(f"❌ FILE SYSTEM ERROR: {e}")
         sys.exit(1)
     except Exception as e:
-        # This will catch other errors during the pipeline execution
-        print(f"❌ An unexpected error occurred: {e}", file=sys.stderr)
-        # For debugging, you might want to uncomment the next line to see the full traceback
-        # import traceback; traceback.print_exc()
+        # Catch-all for any other unexpected error during the pipeline
+        logging.error(f"❌ An unexpected error occurred: {e}")
+        # Provide full traceback in debug mode (if user sets logging level to DEBUG)
+        logging.debug(traceback.format_exc())
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
-

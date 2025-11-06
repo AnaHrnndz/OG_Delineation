@@ -47,13 +47,13 @@ This allows you to enrich the sequences within the tree with functional annotati
 
 ## ⚙️ Requirements and Dependencies
 
-This project requires Python 3.x and several specialized bioinformatics and data manipulation libraries.
+This project requires Python 3.x and other bioinformatics tools and libraries.
 
 * **Python 3.x**
 * **ete4** 
 * **eggnog-mapper** 
 * **Biopython**
-* Other standard dependencies (e.g., `NumPy`, `Pandas`).
+* **FastRoot.py**
 
 > **Note:** The use of **Apptainer/Singularity** is highly recommended for a reproducible environment, as suggested by the `apptainer_ogd` folder.
 
@@ -70,17 +70,32 @@ This project requires Python 3.x and several specialized bioinformatics and data
 
 2.  **Install dependencies:**
 
-    *(Add your specific installation steps here, or refer to your Apptainer setup.)*
+   
 
 3.  **Execution:**
 
+    
     ```bash
-    python og_delineation.py <tree_file> <taxonomy_file> [OPTIONS]
+    og_delineation.py --tree <tree_file> --output_path  <output_folder> [OPTIONS]
+    ```
+
+    Run OGD and open visualization with ete4
+    ```bash
+    ./og_delineation.py --tree tree.nw  --output_path ./ogd_results  --open_visualization 
+    ```
+
+    Run OGD with MinVar rooting method
+    ```bash
+    ./og_delineation.py --tree tree.nw  --output_path ./ogd_results --rooting MinVar 
+    ```
+
+    Only Visualization with ete4
+    ```bash
+    og_delineation.py --tree tree.tree_annot.nw  --output_path ./ogd_results --only_visualization 
     ```
 
     *To view all available command-line options, run:*
     ```bash
-    python og_delineation.py -h
+    og_delineation.py -h
     ```
-
 ---

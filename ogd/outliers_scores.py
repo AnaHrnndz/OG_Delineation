@@ -1,234 +1,151 @@
-from ete4 import PhyloTree
+
+
+from collections import Counter, defaultdict
+from typing import Set, Dict, Any, Tuple, List
+import logging
 import numpy as np
-from collections import defaultdict, Counter, OrderedDict
+from ete4 import PhyloTree
+
 import ogd.utils as utils
 
+# --- Main  Function ---
+
+def run_outliers_and_scores(
+    t: PhyloTree, 
+    taxonomy_db: Any, 
+    num_total_sp: int, 
+    level2sp_mem: Dict, 
+    args: Any
+) -> Tuple[PhyloTree, Dict, Set]:
+    """
+    Main function for Step 3: Detects outliers, calculates scores, and annotates the tree.
+    """
+    logging.info(f"Parameters: BestTaxaThr={args.best_tax_thr}, LineageThr={args.lineage_thr}, SpLossPerc={args.sp_loss_perc}.")
+    logging.info(f"Species Overlap Thresholds: General: {args.so_all}, Eukaryotes: {args.so_euk or 'N/A'}, Bacteria: {args.so_bact or 'N/A'}, Archaea: {args.so_arq or 'N/A'}  ")
+    
+    content = t.get_cached_content()
+    _initialize_root_node(t, content)
+    
+    long_leaves = detect_long_leaves_branches(t)
+    total_leaf_outliers = set(long_leaves)
+
+    for node in t.traverse("preorder"):
+        
+        # Clean up properties to ensure a clean run
+        if not utils.is_gtdb(taxonomy_db):
+            node.del_prop('named_lineage')
+        node.del_prop('_speciesFunction')
+
+        if node.is_leaf:
+            node.add_prop('lca_node', node.props.get('taxid'))
+        else:
+            parent_outliers = set()
+            if node.up:
+                parent_outliers = set( node.up.props.get('sp_out') )
+               
+            # The processing of internal nodes 
+            leaves_out_node = _process_internal_node(
+                node, parent_outliers, taxonomy_db, num_total_sp, level2sp_mem, content, long_leaves, args
+            )
+            total_leaf_outliers.update(leaves_out_node)
+    
+    logging.info(f"Identified {len(long_leaves)} leaves as long-branch outliers.")
+    logging.info(f"Identified {len(total_leaf_outliers)} leaves as taxonomical outliers.")
+    
+    t, props = utils.sanitize_tree_properties(t)
+    
+    return t, content, total_leaf_outliers
 
 
-##  3. Outliers and Scores
-def run_outliers_and_scores(t, taxonomy_db, num_total_sp, level2sp_mem, args):
 
-    mssg = f"""
-    2. Detect outlierts and get scores:
-        -Outliers thresholds:
-            Best Taxa Threshold: {args.best_tax_thr}
-            Lineage Threshold: {args.lineage_thr} 
-        -Species losses percentage threshold: {args.sp_loss_perc}"""
-    print(mssg)
 
-    #t = PhyloTree(t_nw, parser = 0)
-
-    CONTENT = t.get_cached_content()
-   
-    t.add_prop('is_root', str('True'))
-
-    sp_in_root = [l.props.get('taxid') for l in t]
+def _initialize_root_node(t: PhyloTree, content: Dict):
+    """Adds the initial properties to the tree's root node."""
+    t.add_prop('is_root', 'True')
+    sp_in_root = [str(leaf.props.get('taxid')) for leaf in content[t]]
     t.add_prop('sp_in', sp_in_root)
     
 
-    # Detect long branches
-    long_leaves = detect_long_branches(t)
-    total_outliers = set()
-
-    for n in t.traverse("preorder"):
-
-        if 'ncbi_taxonomy' in str(taxonomy_db):
-            n.del_prop('named_lineage')
-        
-        n.del_prop('_speciesFunction')
-
-        if n.is_leaf:
-            n.add_prop('lca_node', n.props.get('taxid'))
-
-        else:
-            
-            n.add_prop('old_lca_name',(n.props.get('sci_name')))
-
-            #DETECT OUTLIERS
-            sp_out = set()
-            leaves_out = set()
-            sp_in = list()
-            leaves_in = set()
-            
-            #Add outliers from upper nodes
-            if args.inherit_outliers == 'Yes':
-                sp_out_inherit = add_upper_outliers(n, CONTENT)
-                sp_out.update(sp_out_inherit)
-
-            
-            
-            # Call outlierts detection and update the set with the species taxid that are outliers
-            sp_out.update(outliers_detection(n, args.lineage_thr, args.best_tax_thr, CONTENT, level2sp_mem, sp_out, taxonomy_db))
-            if n.name == 'A-1':
-                print(sp_out)
-
-#   Detect outliers
-            ch1 = n.children[0]
-            ch2 = n.children[1]
-            
-            #  Save info for children_node_1 and children_node_2
-            ch1_name = n.children[0].props.get('name')
-            ch1_leaf_names = list(ch1.leaf_names())
-            sp_ch1 = set()
-            leaves_ch1 = set()
-            
-            ch2_name = n.children[1].props.get('name')
-            ch2_leaf_names = list(ch2.leaf_names())
-            sp_ch2 = set()
-            leaves_ch2 = set()
-
-            all_leafs = CONTENT[n]
-            for l in all_leafs:
-                if l.name in long_leaves:
-                    leaves_out.add(l.props.get('name'))
-
-                # Leaves that are outliers have the prop called "taxo_outlier"
-                elif  int(l.props.get('taxid')) in sp_out:
-                    leaves_out.add(l.props.get('name'))
-                    l.add_prop('taxo_outlier', 'true')
-
-                else:
-                    sp_in.append(str(l.props.get('taxid')))
-                    leaves_in.add(l.props.get('name'))
-                    
-                    if l.name in ch1_leaf_names:
-                        sp_ch1.add(str(l.props.get('taxid')))
-                        leaves_ch1.add(l.props.get('name'))
-                    elif l.name in ch2_leaf_names:
-                        sp_ch2.add(str(l.props.get('taxid')))
-                        leaves_ch2.add(l.props.get('name'))
-
-           
-            #   Re-calculate species overlap after detect outliers
-            overlaped_spces = set(sp_ch1 & sp_ch2)
-
-
-            if len(overlaped_spces)>0:
-                so_score = round(float(len(overlaped_spces) / len(set(sp_in))),4)
-                n.add_prop('overlaped_species', list(overlaped_spces))
-            else:
-                so_score = 0.0
-
-
-            #   Update last common ancestor, rank and lineage for the node after detect outliers
-            update_taxonomical_props(n, set(sp_in), taxonomy_db)
-
-            
-            #   Save properties
-            n.add_prop('sp_in', set(sp_in))
-            n.add_prop('len_sp_in', len(set(sp_in)))
-            n.add_prop('sp_in_ch1', sp_ch1)
-            n.add_prop('sp_in_ch2', sp_ch2)
-            n.add_prop('ch1_name', ch1_name)
-            n.add_prop('ch2_name', ch2_name)
-            n.add_prop('leaves_in', leaves_in)
-            n.add_prop('total_leaves', len(n))
-            n.add_prop('len_leaves_in', len(leaves_in))
-            n.add_prop('len_leaves_out', len(leaves_out))
-            n.add_prop('leaves_ch1',list(leaves_ch1))
-            n.add_prop('leaves_ch2',list(leaves_ch2))
-            n.add_prop('leaves_out', list(leaves_out))
-            n.add_prop('so_score', so_score)
-            n.add_prop('sp_out', list(sp_out))
-
-            total_outliers.update(leaves_out)
-
-
-
-            #   Load_node_scores add properties: score1, score2,  inpalalogs_rate, dup_score and species losses
-            inparalogs_rate = get_inparalogs_rate(sp_in)
-            n.add_prop('inparalogs_rate', str(inparalogs_rate))
-
-            score1 = get_score1(len(set(sp_in)), num_total_sp)
-            n.add_prop('score1', score1)
-
-            score2 = get_score2(len(set(sp_in)), len(leaves_in))
-            n.add_prop('score2', score2)
-
-            dup_score = get_dup_score(n)
-            n.add_prop('dup_score', dup_score)
-
-            sp_lost(n, level2sp_mem)
-
-
-            if n.up:
-                sp_in_pnode = n.up.props.get('sp_in')
-                lin_lost_from_pnode = '@'.join(map(str, best_lin_lost(expected_sp=sp_in_pnode, found_sp=set(sp_in), taxonomy_db=taxonomy_db)))
-                n.add_prop('lost_from_uppernode', lin_lost_from_pnode)
-
-
-            #   Based on species overlap threshold define duplication, false duplication and speciation nodes
-            lin_lca = n.props.get('lineage')
-            lca_node = n.props.get('lca_node')
-
-            so_2_use = utils.determine_so_threshold(taxonomy_db, lin_lca, args)
-        
-            if so_score >= so_2_use:
-                
-                if float(n.props.get('species_losses_percentage')) > args.sp_loss_perc:
-                    n.add_prop('evoltype_2', 'FD')
-                else:
-                    n.add_prop('evoltype_2', 'D')
-            else:
-                n.add_prop('evoltype_2', 'S')
-
+def detect_long_leaves_branches(t: PhyloTree) -> Set[str]:
+    """Detects leaves with long branches (50x the tree's average)."""
+    all_dists = [n.dist for n in t.traverse() if n.dist is not None]
+    if not all_dists:
+        return set()
     
-    t, props = utils.sanitize_tree_properties(t)
-
+    mean_length = np.mean(all_dists)
+    threshold = mean_length * 50
     
-    return t, CONTENT, total_outliers
-
-
-
-def detect_long_branches(t):
-
-    """
-        Detect leaves with long branches
-        Long branches leaves are when a leave's branch is 50 times bigger than the mean of the branches for the whole tree
-        Remove entire nodes do not perform well when basal branches are too large (ex Phou fam)
-    """
-
-    #length_leaves = list()
-    total_dist = list()
-    for n in t.traverse():
-        # Skip root dist (Root dist is None)
-        if n.dist != None:
-            if n.is_leaf:
-                #length_leaves.append(n.dist)
-                total_dist.append(n.dist)
-            else:
-                total_dist.append(n.dist)
-
-    
-    mean_length = np.mean(total_dist)
     long_leaves = set()
-    # Only check dist for leaves, not for internal nodes
-    for l in t:
-        if l.dist > mean_length*50:
-            long_leaves.add(l.name)
-            l.add_prop('long_branch_outlier', 'True')
-
+    for leaf in t:
+        if leaf.dist > threshold:
+            long_leaves.add(leaf.name)
+            leaf.add_prop('long_branch_outlier', 'True')
+    
     return long_leaves
 
 
-
-def add_upper_outliers(n, CONTENT):
-
+def _process_internal_node(
+    n: PhyloTree, parent_outliers: Set[int], taxonomy_db: Any, num_total_sp: int, level2sp_mem: Dict, 
+    content: Dict, long_leaves: Set[str], args: Any
+) -> Set[str]:
     """
-        Get outliers species in upper nodes
+    Processes a single internal node: detects outliers, classifies leaves, 
+    calculates scores, and determines the evolutionary event type.
     """
 
-    sp_out_inherit = set()
-    if n.up and n.up.props.get('sp_out'):
-        sp_out_up = n.up.props.get('sp_out')
-        for sp in sp_out_up:
-            if (sp) in [leaf.props.get('taxid') for leaf in CONTENT[n]]:
-                sp_out_inherit.add(sp)
+    n.add_prop('old_lca_name', n.props.get('sci_name'))
+
+    # 1. Outlier detection
+    sp_out = _detect_node_outliers(n, content, parent_outliers, level2sp_mem, taxonomy_db, args)
     
-    return sp_out_inherit
+    # 2. Leaf classification 
+    node_classification = _classify_leaves(n, content, sp_out, long_leaves)
+
+  
+    # 3. Overlap calculation and taxonomy update
+    so_score = _calculate_species_overlap(n, node_classification['sp_in_ch1'], node_classification['sp_in_ch2'], node_classification['sp_in'])
+    
+    update_taxonomical_props(n, node_classification['sp_in'], taxonomy_db)
+    
+    # 4. Score calculation and species loss
+    _calculate_and_set_scores(n, node_classification, sp_out, num_total_sp, level2sp_mem, taxonomy_db)
+    
+    # 5. Determination of the evolutionary event type (D, FD, S)
+    _determine_evolutionary_event(n, taxonomy_db, so_score, args)
+
+    # 6. Save remaining properties
+    _set_final_node_properties(n, node_classification, sp_out, so_score)
+
+    return node_classification['leaves_out']
 
 
-def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_out_up, taxonomy_db):
+
+
+# --- Sub-functions of _process_internal_node ---
+# 1. Outlier detection
+def _detect_node_outliers(n: PhyloTree, content: Dict, parent_outliers: Set[int], level2sp_mem: Dict, taxonomy_db: Any, args: Any) -> Set[str]:
+    """Detects and returns a set of outlier species for the node."""
+    
+    sp_out = set()
+    
+    #1.1 Inherit taxonomic outliers from parent node
+    if not args.no_inherit_outliers:
+        parent_out_in_node = add_upper_outliers(n, content, parent_outliers)
+        sp_out.update(parent_out_in_node)
+    
+    #1.2 Detect node-specific taxonomic outliers  
+    sp_out.update(outliers_detection(n, args.lineage_thr, args.best_tax_thr, content, level2sp_mem, sp_out, taxonomy_db))
+    
+    return sp_out
+
+def add_upper_outliers(n: PhyloTree, content: Dict, parent_outliers: Set[int]) -> Set[int]:
+    """Inherits outliers from the parent if its species are in the current node ."""
+    
+    node_species = set(map(str, [leaf.props.get('taxid') for leaf in content[n]]))
+    
+    return parent_outliers.intersection(node_species)
+
+def outliers_detection(n, lineage_thr, best_tax_thr, content, level2sp_mem, sp_out_up, taxonomy_db):
 
     """
         Detect outliers for each taxid from lineages
@@ -240,7 +157,6 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
                 lin_in_tree
     """
 
-    
     sp_in_node = set()
 
     """
@@ -249,12 +165,12 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
     """
     sp_per_level_in_node = defaultdict(set)
     
-    for l in CONTENT[n]:
-        if l.props.get('taxid') not in sp_out_up:
-            sp_in_node.add(l.props.get('taxid'))
+    for l in content[n]:
+        if str(l.props.get('taxid')) not in sp_out_up:
+            sp_in_node.add(str(l.props.get('taxid')))
             utils.update_sp_per_level_in_node(sp_per_level_in_node, taxonomy_db, l)
 
-   
+    
     """
     Select best taxonomic level for the node. 
     Best level its the most recent level that grouped >90% sp in the node
@@ -272,13 +188,13 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
         perc_tax_in_node = n_sp_list/len(sp_in_node)
         ptax[depth_tax][tax] = perc_tax_in_node
         
-    
 
     """
-    Once that I have the depth of all the lineages, sort the list in reverse 
-    to traverse from more recent to the oldest (oldest always will be cell_org)
-    First level with more that 90% of species will be the best_tax
+    Once I have the depth of all the lineages, sort the list in reverse to traverse 
+    from the most recent to the oldest (the oldest is always cell_org). 
+    The first level with more than 90% of species will be set as the 'best taxon'.
     """
+    
     depths_list = (list(ptax.keys()))
     depths_list.sort(reverse=True)
 
@@ -299,9 +215,9 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
     else:
         n.add_prop('best_tax', 'NO LEAVES')
 
-   
+
     best_tax_lineage =  utils.get_lineage(taxonomy_db, best_tax)
-   
+    
     # For the sp that do not belong to the best_tax level, check if are outliers or not
     sp_keep = sp_per_level_in_node[best_tax]
     candidates2remove = sp_in_node.difference(sp_keep)
@@ -310,8 +226,8 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
     for sp in candidates2remove:
         
         total_lin = utils.get_lineage(taxonomy_db, sp)
-        lin2use = set(total_lin).difference(set(best_tax_lineage))
         
+        lin2use = set(total_lin).difference(set(best_tax_lineage))
         
         for l in lin2use:
 
@@ -330,6 +246,59 @@ def outliers_detection(n, lineage_thr, best_tax_thr, CONTENT, level2sp_mem, sp_o
     
     return sp2remove
 
+
+# 2. Leaf classification 
+def _classify_leaves(n: PhyloTree, content: Dict, sp_out: Set[str], long_leaves: Set[str]) -> Dict:
+    """Classifies the node's leaves into 'in' and 'out' and groups them by child."""
+    
+    classification = {
+        'leaves_in': set(), 'leaves_in_names': set(), 'leaves_out': set(), 'sp_in':set(),
+        'sp_in_ch1': set(), 'leaves_in_ch1': set(),
+        'sp_in_ch2': set(), 'leaves_in_ch2': set()
+    }
+    
+    ch1_leaf_names = set(n.children[0].leaf_names())
+    
+    n.add_prop('sp_in_ch1',set())
+    n.add_prop('sp_in_ch2',set())
+    n.add_prop('sp_in',set())
+    
+    for leaf in content[n]:
+        
+        taxid_str = str(leaf.props.get('taxid'))
+        is_outlier = (leaf.name in long_leaves) or (taxid_str in sp_out)
+        
+        if is_outlier:
+            classification['leaves_out'].add(leaf.name)
+            
+            if taxid_str in sp_out:
+                leaf.add_prop('taxo_outlier', 'true')
+        else:
+            classification['leaves_in'].add(leaf)
+            classification['leaves_in_names'].add(leaf.name)
+            classification['sp_in'].add(taxid_str)
+            n.props.get('sp_in').add(taxid_str)    
+            if leaf.name in ch1_leaf_names:
+                classification['sp_in_ch1'].add(taxid_str)
+                classification['leaves_in_ch1'].add(leaf.name)
+                n.props.get('sp_in_ch1').add(taxid_str)
+            else:
+                classification['sp_in_ch2'].add(taxid_str)
+                classification['leaves_in_ch2'].add(leaf.name)
+                n.props.get('sp_in_ch2').add(taxid_str)
+    
+    return classification
+
+
+# 3. Overlap calculation and taxonomy update
+def _calculate_species_overlap(n: PhyloTree, sp_in_ch1: Set[str], sp_in_ch2: Set[str], sp_in_set: Set[str]) -> float:
+    """Calculates and returns the species overlap score."""
+    
+    overlapped_species = sp_in_ch1.intersection(sp_in_ch2)
+    n.add_prop('overlaped_species', list(overlapped_species))
+    
+    return round(len(overlapped_species) / len(sp_in_set), 4) if sp_in_set else 0.0
+
 def update_taxonomical_props(n, sp_in, taxonomy_db):
 
     """
@@ -337,6 +306,7 @@ def update_taxonomical_props(n, sp_in, taxonomy_db):
     """
 
     if len(sp_in) > 0:
+        
         lca_node = utils.get_lca_node(sp_in, taxonomy_db)
         
         if lca_node == 'r_root':
@@ -347,7 +317,8 @@ def update_taxonomical_props(n, sp_in, taxonomy_db):
 
             rank = utils.get_rank(taxonomy_db, lca_node)
             lin_lca = utils.get_lineage(taxonomy_db, lca_node)
-            lca_node_name = utils.get_lca_node_name(taxonomy_db, lca_node)
+            #lca_node_name = utils.get_lca_node_name(taxonomy_db, lca_node)
+            lca_node_name = utils.get_scientific_name(taxonomy_db, lca_node)
 
         n.add_prop('lineage', lin_lca)
         n.add_prop('taxid', lca_node)
@@ -366,16 +337,37 @@ def update_taxonomical_props(n, sp_in, taxonomy_db):
         n.props['sci_name'] = n.props.get('Empty')
 
 
+# 4. Scores calculation and species loss
+def _calculate_and_set_scores(n: PhyloTree, node_classification: Dict, sp_out: Set[str], num_total_sp: int, level2sp_mem: Dict, taxonomy_db: Any):
+    """Calculates and adds all scores (inparalogs, dup_score, s1, s2, etc.) to the node."""
+    
+    n.add_prop('inparalogs_rate', get_inparalogs_rate(node_classification['leaves_in']))
+    
+    n.add_prop('score1', get_score1(len(node_classification['sp_in']), num_total_sp))
+    
+    n.add_prop('score2', get_score2(len(node_classification['sp_in']), len(node_classification['leaves_in']))) 
+    
+    n.add_prop('dup_score', get_dup_score(n))
+    
+    sp_lost(n, sp_out, level2sp_mem)
+   
+    if n.up and n.up.props.get('sp_in'):
+        
+        lost_lineage = best_lin_lost(
+            expected_sp=set(n.up.props['sp_in']),
+            found_sp=node_classification['sp_in'],
+            taxonomy_db=taxonomy_db
+        )
+       
+        n.add_prop('lost_from_uppernode', '@'.join(map(str, lost_lineage)))
 
 
-def get_inparalogs_rate(sp_in):
+def get_inparalogs_rate(leaves_in):
+    """Calculate the median number of inparalogs inparalogs = seqs that belong to the same species"""
 
-    """
-        Calculate the median number of inparalogs
-        inparalogs = seqs that belong to the same species
-    """
-
-    dups_per_sp = Counter(sp_in)
+    list_sp_in = [l.props.get('taxid') for l in leaves_in]
+    
+    dups_per_sp = Counter(list_sp_in)
     
     inparalogs_rate = np.median(list(dups_per_sp.values()))
     
@@ -394,7 +386,6 @@ def get_score2(len_sp_in, nseqs):
 def get_dup_score(n):
 
     """
-       Get Duplication Score (Dup score)
        Duplication Score: number of shared species in both children nodes divided by the smallest number of species
        Similiar to species overlap, but species overlap uses the sum of all the species found in children nodes
        Duplication score use the number of species of the children node with less species.
@@ -403,6 +394,7 @@ def get_dup_score(n):
     sp1 = n.props.get('sp_in_ch1')
     sp2 = n.props.get('sp_in_ch2')
 
+    
     if len(sp1) == 0 and len(sp2) == 0:
         return 0
 
@@ -413,69 +405,103 @@ def get_dup_score(n):
     
     return dup_score
 
-def best_lin_lost(expected_sp, found_sp, taxonomy_db):
-
-    diff_sp = expected_sp.difference(found_sp)
-
-    sp_lost_per_level = defaultdict(set)
-    for sp in diff_sp:
-
-        lin2use = utils.get_lineage(taxonomy_db, sp)
-        
-        for tax in lin2use:
-            sp_lost_per_level[tax].add(sp)
-
-    sp_exp_per_level = defaultdict(set)
-    for sp in expected_sp:
-
-        lin2use = utils.get_lineage(taxonomy_db, sp)
-        
-        for tax in lin2use:
-            sp_exp_per_level[tax].add(sp)
-
-    ptax = defaultdict(dict)
-    for tax, num in sp_lost_per_level.items():
-        depth_tax = len(utils.get_lineage(taxonomy_db, sp))
-        
-        perc_tax_in_node = len(num)/len(sp_exp_per_level[tax]) 
-        ptax[depth_tax][tax] = perc_tax_in_node
-
-    depths_list = (list(ptax.keys()))
-    depths_list.sort()
-
-    best_loss = []
-
-    for depth in depths_list:
-        if depth not in [1, 2]:
-            for tax, perc in ptax[depth].items():
-
-                if  perc >=0.80:
-                    best_loss = [tax, perc]
-                    break
-    
-    return best_loss
-
-def sp_lost(n, level2sp_mem):
-
+def sp_lost(n, sp_out, level2sp_mem):
     """
     Calculate the number and percentage of species that have been lost in the node for the lca.
     If the lca of the node is bacteria and there are 10 species of bacteria, but in the tree there are in total 20 species of bacteria
     10 species will have been lost, corresponding to 50%.
     """
-
+    
     lca_node = str(n.props.get('lca_node'))
     sp_in = set(n.props.get('sp_in'))
-
-    expected_sp = set(level2sp_mem[lca_node])
     
-    if len(sp_in) == 0 or len(expected_sp) == 0:
-        diff_sp = expected_sp.difference(sp_in)
+    if lca_node == 'Empty':
+        diff_sp =  sp_out
         perc_diff_sp = 1.0
+
     else:
-        diff_sp = expected_sp.difference(sp_in)
-        perc_diff_sp = len(diff_sp) / len(expected_sp)
+        
+        expected_sp = level2sp_mem[lca_node]
+
+        if len(sp_in) == 0 or len(expected_sp) == 0:
+            diff_sp = expected_sp.difference(sp_in)
+            perc_diff_sp = 1.0
+        else:
+            diff_sp = expected_sp.difference(sp_in)
+            perc_diff_sp = len(diff_sp) / len(expected_sp)
 
     n.add_prop('species_losses', len(diff_sp))
     n.add_prop('species_losses_percentage', perc_diff_sp)
 
+
+def best_lin_lost(expected_sp: Set[str], found_sp: Set[str], taxonomy_db: Any) -> list:
+    """Identifies the most recent and significant lineage loss event."""
     
+    lost_species = expected_sp.difference(found_sp)
+    if not lost_species:
+        return []
+
+    sp_per_taxon = defaultdict(set)
+    lineage_cache = {}
+
+    for sp in expected_sp:
+        lineage = utils.get_lineage(taxonomy_db, sp)
+        lineage_cache[sp] = lineage
+        for taxon in lineage:
+            sp_per_taxon[taxon].add(sp)
+
+    taxa_with_losses = {taxon for sp in lost_species for taxon in lineage_cache.get(sp, [])}
+    
+    loss_candidates = []
+    for taxon in taxa_with_losses:
+        expected_in_taxon = sp_per_taxon[taxon]
+        lost_in_taxon = lost_species.intersection(expected_in_taxon)
+        percentage_lost = len(lost_in_taxon) / len(expected_in_taxon)
+
+        if percentage_lost >= 0.80:
+            # Get depth from any species in the taxon group to avoid extra DB calls
+            depth = len(lineage_cache[next(iter(expected_in_taxon))])
+            if depth > 2:
+                loss_candidates.append((depth, taxon, percentage_lost))
+
+    if not loss_candidates:
+        return []
+
+    loss_candidates.sort() # Sorts by depth (the first element of the tuple)
+    best_loss = loss_candidates[0]
+    return [best_loss[1], best_loss[2]] # Return [taxon, percentage]
+
+
+# 5. Determination of the evolutionary event type
+def _determine_evolutionary_event(n: PhyloTree, taxonomy_db: Any, so_score: float, args: Any):
+    """Determines and adds the 'evoltype_2' property (D, FD, S) to the node."""
+    so_threshold = utils.determine_so_threshold(taxonomy_db, n.props.get('lineage', []), args)
+    
+    if so_score >= so_threshold:
+        
+        is_false_dup = float(n.props.get('species_losses_percentage', 0)) > args.sp_loss_perc
+        n.add_prop('evoltype_2', 'FD' if is_false_dup else 'D')
+        
+    else:
+        n.add_prop('evoltype_2', 'S')
+
+
+# 6. Save remaining properties
+def _set_final_node_properties(n: PhyloTree, classification: Dict, sp_out: Set[str], so_score: float):
+    """Adds all final calculated properties to the node."""
+    n.add_prop('sp_in', list(set(classification['sp_in'])))
+    n.add_prop('len_sp_in', len(set(classification['sp_in'])))
+    n.add_prop('sp_in_ch1', list(classification['sp_in_ch1']))
+    n.add_prop('sp_in_ch2', list(classification['sp_in_ch2']))
+    n.add_prop('ch1_name', n.children[0].props.get('name'))
+    n.add_prop('ch2_name', n.children[1].props.get('name'))
+    n.add_prop('leaves_in', list(classification['leaves_in_names']))
+    n.add_prop('total_leaves', len(n))
+    n.add_prop('len_leaves_in', len(classification['leaves_in']))
+    n.add_prop('len_leaves_out', len(classification['leaves_out']))
+    n.add_prop('leaves_ch1', list(classification['leaves_in_ch1']))
+    n.add_prop('leaves_ch2', list(classification['leaves_in_ch2']))
+    n.add_prop('leaves_out', list(classification['leaves_out']))
+    n.add_prop('so_score', so_score)
+    n.add_prop('sp_out', list(sp_out))
+

@@ -11,30 +11,13 @@ import json
 import logging
 import re
 import tempfile
-from collections import Counter, OrderedDict
-from pathlib import Path
-from typing import Set, Union
-
-"""
-Utility functions for the Orthologous Group Delineation (OGD) pipeline.
-
-This module provides a collection of helper functions for tasks such as
-file system operations, string manipulation, tree processing, and interacting
-with taxonomy databases in a generic way.
-"""
-
-import argparse
-import json
-import logging
-import re
-import tempfile
-from collections import Counter, OrderedDict
+from collections import Counter, OrderedDict, defaultdict
 from pathlib import Path
 from typing import Set, Union
 
 from ete4 import GTDBTaxa, NCBITaxa, PhyloTree
 
-# --- Type Aliases ---
+# ---  Aliases ---
 TaxonomyDB = Union[NCBITaxa, GTDBTaxa]
 
 # --- Constants ---
@@ -55,24 +38,13 @@ class OrderedCounter(Counter, OrderedDict):
         return self.__class__, (OrderedDict(self),)
 
 
-    
-
-
 # --- File System and String Manipulation ---
 
 def create_temp_dir(output_path: Path) -> Path:
     """
     Creates a temporary directory for intermediate files.
-
-    Tries to create the directory within the specified output path. If it fails
-    (e.g., due to permissions), it falls back to the system's default temporary
-    directory.
-
-    Args:
-        output_path: The Path object for the main output directory.
-
-    Returns:
-        The Path object for the created temporary directory.
+    Tries to create the directory within the specified output path. 
+    If it fails, back to the system's default temporary directory.
     """
     try:
         tmpdir = tempfile.mkdtemp(dir=output_path)
@@ -86,7 +58,7 @@ def sanitize_string_for_newick(text: str) -> str:
     """Removes characters that can break the Newick format and replaces spaces."""
     if not isinstance(text, str):
         return str(text)
-    # Remove problematic characters: ', [, ], =, -, :
+    # Remove problematic characters: 
     sanitized = re.sub(r"['\[\]=\-:]", "", text)
     # Replace spaces with underscores
     return sanitized.replace(' ', '_')
@@ -96,23 +68,19 @@ def remove_file_extension(filename: str) -> str:
     Removes known extensions from a filename string, handling multiple extensions.
     """
     p = Path(filename)
-    # Sequentially remove suffixes until no known extension is found
-    while p.suffix in {'.gz', '.bz2', '.zip', '.faa', '.nw', '.fa', '.fasta'}:
+    
+    while p.suffix in {'.faa', '.nw', '.fa', '.fasta'}:
         p = p.with_suffix('')
     return p.name
 
 
-# --- Taxonomy Abstraction ---
+# --- Taxonomy Abstraction Layer ---
 
 def is_gtdb(tax_db: TaxonomyDB) -> bool:
     """Checks if the provided taxonomy database is GTDB."""
     return isinstance(tax_db, GTDBTaxa)
 
-def get_scientific_name(tax_db: TaxonomyDB, taxid: Union[int, str]) -> str:
-    """Gets the scientific name for a given taxid, abstracting the db type."""
-    if is_gtdb(tax_db):
-        return str(taxid)
-    return tax_db.get_taxid_translator([int(taxid)])[int(taxid)]
+
 
 def get_rank(tax_db: TaxonomyDB, taxid: Union[int, str]) -> str:
     """Gets the rank for a given taxid, abstracting the db type."""
@@ -123,65 +91,86 @@ def get_rank(tax_db: TaxonomyDB, taxid: Union[int, str]) -> str:
             'f': 'Family', 'g': 'Genus', 's': 'Species', 'r_root': 'root'
         }
         return rank_map.get(rank_code, 'Unknown')
-    raw_rank = tax_db.get_rank([int(taxid)])[int(taxid)]
-    return sanitize_string_for_newick(raw_rank)
+    try:
+        raw_rank = tax_db.get_rank([int(taxid)])[int(taxid)]
+        return sanitize_string_for_newick(raw_rank)
+    except (ValueError, KeyError):
+        return "Unknown"
+
+def get_lineage(tax_db: TaxonomyDB, taxid: Union[int, str]) -> list:
+    """Gets the lineage for a given taxid, abstracting the db type."""
+    # Return empty list for invalid/empty taxids
+    if not taxid or taxid == 'Unk' or taxid == 'Empty':
+        return []
+        
+    if is_gtdb(tax_db):
+        try:
+            # GTDB uses string names as taxids
+            return tax_db.get_name_lineage([str(taxid)])[0].get(str(taxid), [])
+        except (KeyError, IndexError):
+            return [] # Handle if GTDB name is not found
+    else:
+        try:
+            # NCBI uses integer taxids
+            return tax_db.get_lineage(int(taxid))
+        except (ValueError, KeyError):
+            return [] # Handle if taxid is not an int or not found
 
 def get_lca_node(species_set: Set[str], tax_db: TaxonomyDB) -> str:
-    """
-    Finds the Last Common Ancestor (LCA) for a given set of species taxids.
-    """
+    """Finds the Last Common Ancestor (LCA) for a given set of species taxids."""
     if not species_set:
         return 'Unk'
 
-    # Count occurrences of each taxon in all lineages
     lineage_counts = OrderedCounter()
     for species_id in species_set:
+        
         lineage = get_lineage(tax_db, species_id) 
         if lineage:
             lineage_counts.update(lineage)
 
-    # The LCA is the most recent (last) taxon present in ALL lineages
+    if not lineage_counts:
+        return 'Unk'
+
     num_species = len(species_set)
     lca_candidates = [taxon for taxon, count in lineage_counts.items() if count == num_species]
     
-    return lca_candidates[-1] if lca_candidates else 'Unk'
+    return str(lca_candidates[-1]) if lca_candidates else 'Unk'
+
+# def get_lca_node_name(tax_db: TaxonomyDB, taxid: Union[int, str]) -> str:
+    # """
+    # Gets the scientific name for a given taxid.
+    # NOTE: This is now an alias for get_scientific_name to fix a bug
+    # and remove redundant logic.
+    # """
+    # return get_scientific_name(tax_db, taxid)
 
 
+def get_scientific_name(tax_db: TaxonomyDB, taxid: Union[int, str]) -> str:
+    """Gets the scientific name for a given taxid, abstracting the db type."""
+    if is_gtdb(tax_db):
+        return str(taxid)
+    try:
+        # NCBI taxids are integers
+        return tax_db.get_taxid_translator([int(taxid)])[int(taxid)]
+    except (ValueError, KeyError):
+        return "Unknown" # Handle if taxid is invalid
 
-def get_lineage(taxonomy_db, taxid):
-    if 'ncbi_taxonomy' in str(taxonomy_db):
-        lin = taxonomy_db.get_lineage(taxid)
+def update_sp_per_level_in_node(sp_per_level_in_node: defaultdict, tax_db: TaxonomyDB, leaf_node: PhyloTree):
+    """Updates a species counter dict based on a leaf node's lineage."""
+    
+    if is_gtdb(tax_db):
+        lineage = leaf_node.props.get('named_lineage', [])
+    else:
+        lineage = leaf_node.props.get('lineage', [])
+    
+    taxid = leaf_node.props.get('taxid')
+    if not taxid or not lineage:
+        return # Skip leaves with no data
         
-            
-    elif 'gtdb_taxonomy' in str(taxonomy_db) : 
-        #if lca_tree != 'r_root':
-        lin =  taxonomy_db.get_name_lineage([taxid])[0][taxid]
+    for tax in lineage:
+        # Ensure keys and values are strings for consistency
+        sp_per_level_in_node[str(tax)].add(str(taxid))
 
-    
-    return lin
-
-def update_sp_per_level_in_node(sp_per_level_in_node, taxonomy_db, l):
-
-    
-    if 'ncbi_taxonomy' in str(taxonomy_db):
-        
-        for tax in l.props.get('lineage'):
-            sp_per_level_in_node[tax].add(l.props.get('taxid'))
-
-    elif 'gtdb_taxonomy' in str(taxonomy_db): 
-        for tax in l.props.get('named_lineage'):
-            sp_per_level_in_node[tax].add((l.props.get('taxid')))
-
-    
-def get_lca_node_name(taxonomy_db, taxid):
-    if 'ncbi_taxonomy' in str(taxonomy_db):
-        lca_node_name = taxonomy_db.get_taxid_translator([taxid])[taxid]
-
-    elif 'gtdb_taxonomy' in str(taxonomy_db): 
-        lca_node_name = lca_node
-
-
-    return lca_node_name
 
 # --- Tree Processing ---
 
@@ -197,22 +186,20 @@ def generate_internal_node_name(counter: int) -> str:
         name = _NODE_NAME_CHARS[i % len(_NODE_NAME_CHARS)] + name
         i //= len(_NODE_NAME_CHARS)
         if i == 0: break
-        i -= 1
+        i -= 1 # Decrement for base conversion
     return name
 
-
-def get_node_depth(node):
-
+def get_node_depth(node: PhyloTree) -> int:
     """
-        Get depth of internal nodes
-        Depth = number nodes from root node to target node
+    Get depth of nodes (number of nodes from root to target).
+    Root node has a depth of 1.
     """
     depth = 0
-    while node is not None:
+    current = node
+    while current is not None:
         depth += 1
-        node = node.up
+        current = current.up
     return depth
-
 
 def sanitize_tree_properties(tree: Union[PhyloTree, str]) -> tuple[PhyloTree, Set[str]]:
     """
@@ -224,6 +211,7 @@ def sanitize_tree_properties(tree: Union[PhyloTree, str]) -> tuple[PhyloTree, Se
     for node in phylo_tree.traverse():
         all_prop_keys.update(node.props.keys())
         for prop_name in _PROPERTIES_TO_SANITIZE:
+            # Use .get() to safely check for property existence
             if prop_value := node.props.get(prop_name):
                 node.props[prop_name] = sanitize_string_for_newick(prop_value)
 
@@ -234,9 +222,12 @@ def write_annotated_tree(tree: PhyloTree, output_dir: Path, filename_base: str, 
     Writes the final annotated tree to a Newick file.
     """
     output_path = output_dir / f"{filename_base}.tree_annot.nw"
-    # Convert props set to list for ete4 compatibility
-    tree.write(outfile=str(output_path), props=list(props), format_root_node=True)
-    logging.info(f"Annotated tree written to: {output_path}")
+    try:
+        # Convert props set to list for ete4 compatibility
+        tree.write(outfile=str(output_path), props=list(props), format_root_node=True)
+        logging.info(f"Annotated tree written to: {output_path}")
+    except IOError as e:
+        logging.error(f"Failed to write annotated tree to {output_path}: {e}")
     return output_path
 
 
@@ -252,8 +243,10 @@ def determine_so_threshold(tax_db: TaxonomyDB, lineage: list, args: argparse.Nam
         if args.so_bact is not None and 'd__Bacteria' in lineage_set: return args.so_bact
         if args.so_arq is not None and 'd__Archaea' in lineage_set: return args.so_arq
     else: # NCBI
-        if args.so_euk is not None and 2759 in lineage_set: return args.so_euk
-        if args.so_bact is not None and 2 in lineage_set: return args.so_bact
-        if args.so_arq is not None and 2157 in lineage_set: return args.so_arq
+        # Use integer taxids for NCBI-specific checks
+        int_lineage_set = {int(t) for t in lineage_set if str(t).isdigit()}
+        if args.so_euk is not None and 2759 in int_lineage_set: return args.so_euk
+        if args.so_bact is not None and 2 in int_lineage_set: return args.so_bact
+        if args.so_arq is not None and 2157 in int_lineage_set: return args.so_arq
             
     return args.so_all
