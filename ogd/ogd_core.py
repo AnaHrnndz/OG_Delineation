@@ -13,7 +13,7 @@ from ogd.timer import Timer
 from ogd.handle_input import load_all_input_files
 from ogd.tree_setup import run_setup
 from ogd.outliers_scores import run_outliers_and_scores
-from ogd..s import run_get_main_dups
+from ogd.select_dups import run_get_main_dups
 from ogd.orthologs_groups import get_all_ogs
 import ogd.pairs as pairs
 from ogd.emapper_annotate import annotate_with_emapper
