@@ -42,6 +42,7 @@ def run_outliers_and_scores(
             parent_outliers = set()
             if node.up:
                 parent_outliers = set( node.up.props.get('sp_out') )
+                
                
             # The processing of internal nodes 
             leaves_out_node = _process_internal_node(
