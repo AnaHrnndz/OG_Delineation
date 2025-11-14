@@ -6,7 +6,7 @@ import ogd.emapper_layouts as el
 import sys
 
 
-def run_smartview(tree, alignment):
+def run_smartview(tree, alignment, user_ip):
 
     props_popup = ['node_is_og', 'dist', 'species_losses', 'node_create_og', 'lca_node_name', 'len_leaves_in', 
     'taxid', 'sci_name', 'lineage', 'lca_dup', 'inparalogs_rate', 'ch1_name', 'dup_node_name', 'is_root', 
@@ -26,8 +26,13 @@ def run_smartview(tree, alignment):
         pfam_layout = Layout('PFAM', draw_node=el.draw_pfam_domains(tree, len_alg=len_alg))
         all_layouts.append(pfam_layout)
 
+    if user_ip:
+        host = user_ip
+    else:
+        host = 'localhost'
+
    
-    tree.explore(layouts=all_layouts, show_leaf_name=False, show_popup_props=props_popup, keep_server=True, host='138.4.138.141', port=5000)
+    tree.explore(layouts=all_layouts, show_leaf_name=False, show_popup_props=props_popup, keep_server=True, host=host, port=5000)
 
 
 if __name__ == "__main__":

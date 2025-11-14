@@ -109,6 +109,7 @@ def run_ogd_pipeline(args: argparse.Namespace):
         logging.info("\n--- Step 10 (Optional): Opening ETE Smart View Visualization ---")
         # Robustly pass alignment path only if it exists
         alignment_path = str(args.alg) if args.alg else None
-        run_smartview(processed_tree, alignment_path)
+        user_ip =  args.user_ip if args.user_ip else None
+        run_smartview(processed_tree, alignment_path, user_ip)
     
     
