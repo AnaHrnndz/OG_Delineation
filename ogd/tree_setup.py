@@ -139,7 +139,9 @@ def _run_minvar(tree: PhyloTree, tmpdir: Path, species_delimiter: str) -> PhyloT
     # 5. Load the newly rooted tree using 
     logging.info("MinVar rooting successful. Loading rooted tree...")
     try:
-        rooted_tree = PhyloTree(open(output_tree_path))
+        #rooted_tree = PhyloTree(open(output_tree_path))
+        with open(output_tree_path, 'r') as f:
+            rooted_tree = PhyloTree(f)
         # Re-apply the species naming function as it's a new tree object
         rooted_tree.set_species_naming_function(lambda node: node.name.split(species_delimiter)[0])
         return rooted_tree

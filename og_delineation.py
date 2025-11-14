@@ -104,6 +104,8 @@ def get_args() -> argparse.Namespace:
                          help="Automatically open the ETE smart view GUI after analysis.")
     modules.add_argument('--only_visualization', action='store_true',
                          help="Automatically open the ETE smart view GUI after analysis.")
+    modules.add_argument('--user_IP', dest='user_ip',
+                         help="User IP for ete4 smartview")
 
     return parser.parse_args()
 
@@ -162,7 +164,8 @@ def main():
             from ogd.run_ete4_smartview import run_smartview
             processed_tree = Tree(open(args.tree))
             alignment_path = str(args.alg) if args.alg else None
-            run_smartview(processed_tree, alignment_path)
+            user_ip =  args.user_ip if args.user_ip else None
+            run_smartview(processed_tree, alignment_path, user_ip)
             sys.exit(1)
             
 

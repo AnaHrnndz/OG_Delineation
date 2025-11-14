@@ -62,7 +62,8 @@ def _load_gene_tree(tree_path: Path, species_delimiter: str) -> PhyloTree:
     """
     logging.info(f"Loading gene tree from: {tree_path.name}")
     try:
-        t = PhyloTree(open(tree_path))
+        with open(tree_path, 'r') as f:
+            t = PhyloTree(f)
     except Exception as e:
         logging.error(f"Failed to parse the gene tree file at '{tree_path}'.")
         logging.error(f"Error details: {e}")

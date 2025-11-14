@@ -1,0 +1,15 @@
+name: ogd_env2
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  
+  - python=3.10 
+  - pip
+  
+  - pip:
+    - eggnog-mapper==2.1.13
+    - ete4==4.3.0
+    - FastRoot==1.5

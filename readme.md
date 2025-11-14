@@ -49,10 +49,9 @@ This allows you to enrich the sequences within the tree with functional annotati
 
 This project requires Python 3.x and other bioinformatics tools and libraries.
 
-* **Python 3.x**
+* **Python 3.10**
 * **ete4** 
 * **eggnog-mapper** 
-* **Biopython**
 * **FastRoot.py**
 
 > **Note:** The use of **Apptainer/Singularity** is highly recommended for a reproducible environment, as suggested by the `apptainer_ogd` folder.
@@ -68,8 +67,11 @@ This project requires Python 3.x and other bioinformatics tools and libraries.
     cd OG_Delineation
     ```
 
-2.  **Install dependencies:**
-
+2.  **Install dependencies with conda:**
+    ```bash
+    conda env create -f ogd_env2.yml
+    conda activate ogd_env2
+    ```
    
 
 3.  **Execution:**

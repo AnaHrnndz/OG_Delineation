@@ -13,7 +13,7 @@ from ogd.timer import Timer
 from ogd.handle_input import load_all_input_files
 from ogd.tree_setup import run_setup
 from ogd.outliers_scores import run_outliers_and_scores
-from ogd..s import run_get_main_dups
+from ogd.select_dups import run_get_main_dups
 from ogd.orthologs_groups import get_all_ogs
 import ogd.pairs as pairs
 from ogd.emapper_annotate import annotate_with_emapper
@@ -109,6 +109,7 @@ def run_ogd_pipeline(args: argparse.Namespace):
         logging.info("\n--- Step 10 (Optional): Opening ETE Smart View Visualization ---")
         # Robustly pass alignment path only if it exists
         alignment_path = str(args.alg) if args.alg else None
-        run_smartview(processed_tree, alignment_path)
+        user_ip =  args.user_ip if args.user_ip else None
+        run_smartview(processed_tree, alignment_path, user_ip)
     
     
