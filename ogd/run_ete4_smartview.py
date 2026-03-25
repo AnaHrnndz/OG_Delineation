@@ -31,7 +31,7 @@ def run_smartview(tree, alignment, user_ip):
     else:
         host = 'localhost'
 
-   
+        
     tree.explore(layouts=all_layouts, show_leaf_name=False, show_popup_props=props_popup, keep_server=True, host=host, port=5000)
 
 

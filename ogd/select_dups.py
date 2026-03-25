@@ -124,6 +124,7 @@ def _check_root_as_og(tree: PhyloTree):
 
     # Search for any existing OGs defined at the same taxonomic level as the root.
     if  len(list(tree.search_nodes(monophyletic_og=True, lca_node=root_lca))) == 0:
+    #if  len(list(tree.search_nodes(monophyletic_og=True, lca_dup=root_lca))) == 0:
         tree.add_prop('monophyletic_og', True)
         
     

@@ -62,6 +62,7 @@ def _apply_rooting(tree: PhyloTree, method: str, tmpdir: Path, species_delimiter
     """
     Roots a tree using either Midpoint or MinVar methods.
     """
+    
     if method == "Midpoint":
         try:
             midpoint = tree.get_midpoint_outgroup()
@@ -78,13 +79,13 @@ def _apply_rooting(tree: PhyloTree, method: str, tmpdir: Path, species_delimiter
     elif method == "MinVar":
         # _run_minvar handles its own logging and error reporting
         tree = _run_minvar(tree, tmpdir, species_delimiter)
-    
+        
     elif method is None or method == '':
         logging.info("No rooting method specified. Tree will not be rooted.")
     else:
         # Should not happen if argparse choices are set correctly, but good practice
         logging.warning(f"Unknown rooting method specified: '{method}'. Tree will not be rooted.")
-        
+     
     return tree
 
 
