@@ -31,7 +31,10 @@ def run_smartview(tree, alignment, user_ip):
     else:
         host = 'localhost'
 
-        
+    # Set a small root branch length so the tree renders correctly in smartview
+    # (root.dist may be None, which breaks the layout).
+    tree.dist = 0.1
+    
     tree.explore(layouts=all_layouts, show_leaf_name=False, show_popup_props=props_popup, keep_server=True, host=host, port=5000)
 
 
