@@ -112,20 +112,25 @@ def _find_paraphyletic_ogs(tree: PhyloTree) -> Dict[str, Any]:
     paraphyletic_ogs = {}
     
     for node in tree.traverse():
-        # We only check children of duplication nodes
-        if node.props.get('evoltype_2') != 'D':
+        # Check children of duplication nodes OR the root when same-level duplications exist below
+        is_dup = node.props.get('evoltype_2') == 'D'
+        is_root_with_same_level_dups = node.is_root and not node.props.get('monophyletic_og')
+
+        if not is_dup and not is_root_with_same_level_dups:
             continue
 
-        lca_target = node.props.get('lca_node')
-            
         for child in node.children:
             # If the child is already a monophyletic OG, skip it
             if child.props.get('monophyletic_og') is True:
                 continue
 
+            # For D nodes: use the D node's LCA (children mOGs have lca_dup = D_node.lca_node).
+            # For root: use each child's own LCA, since mOGs below have lca_dup = child.lca_node.
+            lca_target = child.props.get('lca_node') if node.is_root else node.props.get('lca_node')
+
             all_mems = child.props.get('leaves_in', set())
             mems_to_remove = set()
-            
+
             # Find all nested OGs to subtract their members
             # OGs defined from a duplication at the *same* tax level
             nested_ogs = child.search_nodes(monophyletic_og=True, lca_dup=lca_target)
@@ -175,7 +180,8 @@ def _annot_paraphyletic_ogs(
             # Check if this leaf was an outlier *for this POG's node*
             if leaf_name not in node_outlier_leaves:
                 retained_leaves.append(leaf_name)
-                retained_species.add(taxid)
+                if taxid is not None:
+                    retained_species.add(taxid)
                 
                 # Annotate the leaf with its POG
                 old_pog_annot = leaf_node.props.get('pOG', '')
@@ -217,15 +223,10 @@ def _process_root_ogs(tree: PhyloTree, tax_db: TaxonomyDB, ogs_info: Dict):
     if lca_tree not in ['1', '131567', 'r_root', 'Unk']:
         lineage = set( map(str, utils.get_lineage(tax_db, lca_tree) ))
 
-
-
         if '1' in lineage: lineage.remove('1') # Remove 'root'
         
         # We want ancestors *not* including the root's own LCA
-        try:
-            lineage.remove(lca_tree) 
-        except ValueError:
-            pass 
+        lineage.discard(lca_tree)
             
         all_leaves = tree.props.get('leaves_in', [])
         
@@ -360,7 +361,7 @@ def _add_entry_to_ogs_info(ogs_info: Dict, values: list):
         'Lca_Dup': str(lca_dup),
         'Species_Outliers': sp_outliers_list,
         'Num_SP_Outliers': num_sp_out,
-        'Inparalogs_Rate': float(inparalogs_rate),
+        'Inparalogs_Rate': float(inparalogs_rate) if inparalogs_rate is not None else 0.0,
         'SP_overlap_dup': species_overlap
     }
 

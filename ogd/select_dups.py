@@ -41,13 +41,15 @@ def run_get_main_dups(
             lca_target = node.props.get('lca_node')
             child1, child2 = node.children
 
-            is_child1_nested_dup = False
-            for n_ in  child1.search_nodes(evoltype_2='D', lca_node=lca_target):
-                is_child1_nested_dup = _is_valid_duplication_node(n_)
+            is_child1_nested_dup = any(
+                _is_valid_duplication_node(n_)
+                for n_ in child1.search_nodes(evoltype_2='D', lca_node=lca_target)
+            )
 
-            is_child2_nested_dup = False
-            for n_ in  child2.search_nodes(evoltype_2='D', lca_node=lca_target):
-                is_child2_nested_dup = _is_valid_duplication_node(n_)                
+            is_child2_nested_dup = any(
+                _is_valid_duplication_node(n_)
+                for n_ in child2.search_nodes(evoltype_2='D', lca_node=lca_target)
+            )
 
             # If a child is NOT a nested duplication, it becomes an OG.
             if not is_child1_nested_dup:
@@ -102,7 +104,10 @@ def _annotate_og_node(
     if len(og_node.props.get('sp_in', set())) > 1 and len(og_node.props.get('leaves_in', [])) > 1:
         
         lca_of_duplication = duplication_node.props.get('lca_node')
-        
+        if lca_of_duplication is None:
+            logging.warning(f"Duplication node {duplication_node.name} has no lca_node. Skipping OG annotation.")
+            return
+
         og_node.add_prop('monophyletic_og', True)
         og_node.add_prop('lca_dup', lca_of_duplication)
         og_node.add_prop('so_score_dup', duplication_node.props.get('so_score'))
@@ -123,8 +128,8 @@ def _check_root_as_og(tree: PhyloTree):
     root_lca = tree.props.get('lca_node')
 
     # Search for any existing OGs defined at the same taxonomic level as the root.
-    if  len(list(tree.search_nodes(monophyletic_og=True, lca_node=root_lca))) == 0:
-    #if  len(list(tree.search_nodes(monophyletic_og=True, lca_dup=root_lca))) == 0:
+    #if  len(list(tree.search_nodes(monophyletic_og=True, lca_node=root_lca))) == 0:
+    if  len(list(tree.search_nodes(monophyletic_og=True, lca_dup=root_lca))) == 0:
         tree.add_prop('monophyletic_og', True)
         
     
