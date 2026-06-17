@@ -1,15 +1,16 @@
-name: ogd_env2
+name: ogd_env
 
 channels:
   - conda-forge
-  - defaults
 
 dependencies:
-  
-  - python=3.10 
+  - python=3.10
   - pip
-  
+
   - pip:
-    - eggnog-mapper==2.1.13
-    - ete4==4.3.0
-    - FastRoot==1.5
+      # Core: OG delineation, ETE4 SmartView visualization, MinVar rooting
+      - ete4==4.4.0
+      - FastRoot==1.5
+      # Functional annotation (optional module).
+      # The eggNOG-mapper pip package bundles the diamond/hmmer binaries it needs.
+      - eggnog-mapper==2.1.13
