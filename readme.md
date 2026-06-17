@@ -92,7 +92,7 @@ OGD reads the species from each leaf name and resolves it against a taxonomy dat
 
 ETE4 handles the download, build, and storage of the NCBI taxonomy database, and lets you choose how and where to store it. Follow ETE4's own documentation for this step:
 
-> **ETE4 — NCBITaxa documentation:** `<ADD LINK — confirm the current ETE4 NCBITaxa docs URL>`
+> **ETE4 — NCBITaxa documentation:** `https://etetoolkit.github.io/ete/tutorial/tutorial_taxonomy.html`
 
 Once it is available, you can either rely on ETE4's default location or point OGD to a specific SQLite file with `--user_taxonomy`:
 
