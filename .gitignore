@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Resultados / salidas de OGD
+ogd_results/
+*.tree_annot.nw
+
+# Bases de datos de taxonomía (no versionar, son enormes)
+*.sqlite
+taxa.sqlite
+
+# Apptainer / Singularity
+*.sif
+
+# Notebooks y SO
+.ipynb_checkpoints/
+.DS_Store
