@@ -1,6 +1,6 @@
-# 🧬 OGD: Orthologous Group Delineation
+## 🧬 OGD: Orthologous Group Delineation
 
-**OGD** is a Python bioinformatics pipeline for **Orthologous Group Delineation** from gene phylogenetic trees. It identifies orthologous groups (OGs) based on the detection and scoring of gene duplication events, using ETE4 for tree manipulation and supporting NCBI and GTDB taxonomy.
+**OGD** is a Python bioinformatics pipeline for **Orthologous Group Delineation** from gene phylogenetic trees. It identifies orthologous groups (OGs) based on the detection and scoring of gene duplication events, using ETE4 for tree manipulation. NCBI taxonomy is the supported backend; GTDB support is experimental (see [Current Limitations](#current-limitations)).
 
 ---
 
@@ -9,8 +9,9 @@
 1. [Main Workflow](#main-workflow)
 2. [Requirements and Dependencies](#requirements-and-dependencies)
 3. [Installation](#installation)
-4. [Quick Start](#quick-start)
-5. [Command-Line Options](#command-line-options)
+4. [Taxonomy Database (required)](#taxonomy-database-required)
+5. [Quick Start](#quick-start)
+6. [Command-Line Options](#command-line-options)
    - [Required Arguments](#required-arguments)
    - [Tree Options](#tree-options)
    - [Taxonomy Options](#taxonomy-options)
@@ -18,8 +19,9 @@
    - [Algorithm Parameters](#algorithm-parameters)
    - [Visualization](#visualization)
    - [Optional Modules](#optional-modules)
-6. [Output Files](#output-files)
-7. [Usage Examples](#usage-examples)
+7. [Output Files](#output-files)
+8. [Usage Examples](#usage-examples)
+9. [Current Limitations](#current-limitations)
 
 ---
 
@@ -31,7 +33,7 @@ The core script (`og_delineation.py`) follows these steps to delineate **Ortholo
 2. **Pre-analysis Setup** — Performs tree adjustments:
    - Polytomy resolution.
    - Tree rooting (*Midpoint* or *MinVar* via FastRoot).
-   - Taxonomic annotation (NCBI or GTDB).
+   - Taxonomic annotation (NCBI).
 3. **Outlier Detection and Score Calculation** — Computes key metrics:
    - Detection of long-branch outliers and taxonomically misplaced sequences.
    - Calculation of **Species Overlap (SO)**, *Duplication Score*, *Inparalogs Rate*, and *Lineage Loss*.
@@ -40,20 +42,11 @@ The core script (`og_delineation.py`) follows these steps to delineate **Ortholo
 6. **Ortholog Pairs** — Generates a table of ortholog pairs.
 7. **Output** — Writes the annotated tree, OG info table, sequence-to-OG mapping, and ortholog pairs.
 
-### Optional Modules
-
-#### 🔄 Recovery Pipeline
-
-Attempts to recover sequences initially excluded from OGs (long-branch or taxonomically misplaced) using an HMM-based approach:
-
-1. Generates FASTA files for sequences excluded from OGs.
-2. Builds an HMM profile for each OG using HMMER.
-3. Runs **HMMscan** to assign excluded sequences to their best-matching OG.
-4. Updates the gene tree and OG information with recovered sequences.
+### Optional Module
 
 #### 📝 eggNOG-mapper Annotation
 
-Enriches sequences with functional annotations (DIAMOND + HMM) using **eggNOG-mapper**, adding GO terms, KEGG pathways, and PFAM domains.
+Enriches sequences with functional annotations (DIAMOND + HMM) using **eggNOG-mapper**, adding GO terms, KEGG pathways, and PFAM domains. See [Optional Modules](#optional-modules) below.
 
 ---
 
@@ -68,15 +61,12 @@ Enriches sequences with functional annotations (DIAMOND + HMM) using **eggNOG-ma
 
 | Tool | Usage | Notes |
 |------|-------|-------|
-| **FAMSA** | Multiple sequence alignment | Binary expected at `og_delineation/bin/famsa` |
-| **HMMER** (`hmmbuild`, `hmmscan`) | HMM-based sequence recovery | Must be in `$PATH` |
 | **FastRoot.py** | MinVar tree rooting | Required only with `--rooting MinVar` |
-| **eggNOG-mapper** | Functional annotation | Required only with `--run_emapper` |
+| **eggNOG-mapper** | Functional annotation | Required only with `--run_emapper` (see [Optional Modules](#optional-modules)) |
 
-### Taxonomy Databases
+### Taxonomy Database
 
-- **NCBI taxonomy** (default): ETE4 SQLite database (e.g., `e6.taxa.sqlite`)
-- **GTDB taxonomy**: via ETE4's `GTDBTaxa`
+- **NCBI taxonomy** via ETE4's `NCBITaxa` (required — see [Taxonomy Database](#taxonomy-database-required)).
 
 ---
 
@@ -87,25 +77,55 @@ Enriches sequences with functional annotations (DIAMOND + HMM) using **eggNOG-ma
 git clone https://github.com/AnaHrnndz/OG_Delineation.git
 cd OG_Delineation
 
-# Create and activate conda environment
-conda env create -f og_delineation/ogd_env2.yml
+# Create and activate the conda environment
+conda env create -f ogd_env2.yml
 conda activate ogd_env2
 ```
+
+This installs the dependencies used for OG delineation (`ete4`, `FastRoot`).
+
+---
+
+## 🗃️ Taxonomy Database (required)
+
+OGD reads the species from each leaf name and resolves it against a taxonomy database through **ETE4's `NCBITaxa`**. You must set this database up **before** running OGD.
+
+ETE4 handles the download, build, and storage of the NCBI taxonomy database, and lets you choose how and where to store it. Follow ETE4's own documentation for this step:
+
+> **ETE4 — NCBITaxa documentation:** `<ADD LINK — confirm the current ETE4 NCBITaxa docs URL>`
+
+Once it is available, you can either rely on ETE4's default location or point OGD to a specific SQLite file with `--user_taxonomy`:
+
+```bash
+./og_delineation.py --tree tree.nw --output_path ./ogd_results \
+  --user_taxonomy /path/to/taxa.sqlite
+```
+
+> **Note — missing taxids stop the run.** Every species identifier in your tree must exist in the taxonomy database. If one does not, OGD aborts with a clear message:
+>
+> ```
+> Failed to build reference species tree. Taxid not found in taxonomy DB: <taxid>.
+> Check that all species identifiers in your tree exist in the taxonomy database.
+> ```
 
 ---
 
 ## 🚀 Quick Start
 
-```bash
-# Minimal run with default settings
-./og_delineation.py --tree tree.nw --output_path ./ogd_results
+Leaf names must encode the species as `SpeciesID<delimiter>GeneName`, with the delimiter defaulting to `.` (for example `9606.ENSP00000269305`). Change it with `--sp_delimitator` if your names use a different separator.
 
-# Run and open visualization in browser when done
-./og_delineation.py --tree tree.nw --output_path ./ogd_results --open_visualization
+```bash
+# Minimal run on the example tree shipped in data/
+./og_delineation.py --tree data/P53.fa.nw --output_path ./ogd_results
+
+# Run and open the interactive ETE SmartView visualization when done
+./og_delineation.py --tree data/P53.fa.nw --output_path ./ogd_results --open_visualization
 
 # All available options
 ./og_delineation.py -h
 ```
+
+> If `./og_delineation.py` is not executable, run `python og_delineation.py ...` instead, or make it executable once with `chmod +x og_delineation.py`.
 
 ---
 
@@ -143,7 +163,7 @@ conda activate ogd_env2
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--taxonomy_type` | `NCBI` | Taxonomy backend: `NCBI` or `GTDB` |
+| `--taxonomy_type` | `NCBI` | Taxonomy backend: `NCBI` or `GTDB` (GTDB is experimental) |
 | `--user_taxonomy PATH` | None | Custom taxonomy SQLite database |
 | `--user_taxonomy_counter PATH` | None | JSON file with precomputed species counts per taxonomic node |
 | `--reftree PATH` | None | Custom reference species tree |
@@ -152,10 +172,7 @@ conda activate ogd_env2
 # NCBI taxonomy (default)
 ./og_delineation.py --tree tree.nw --output_path ./output --taxonomy_type NCBI
 
-# GTDB taxonomy (for prokaryotic genomes)
-./og_delineation.py --tree tree.nw --output_path ./output --taxonomy_type GTDB
-
-# Custom taxonomy
+# Custom taxonomy database / counter / reference tree
 ./og_delineation.py --tree tree.nw --output_path ./output \
   --user_taxonomy /path/to/custom.db \
   --user_taxonomy_counter /path/to/counter.json \
@@ -184,10 +201,6 @@ When a domain-specific threshold is set, it overrides `--sp_ovlap_all` for nodes
 # More stringent globally: fewer but cleaner OGs
 ./og_delineation.py --tree tree.nw --output_path ./output \
   --sp_ovlap_all 0.05
-
-# More permissive globally: more OGs, accepts noisier duplications
-./og_delineation.py --tree tree.nw --output_path ./output \
-  --sp_ovlap_all 0.20
 
 # Domain-specific thresholds
 # (Bacteria more permissive due to HGT; Eukaryota more strict)
@@ -249,13 +262,6 @@ Opens SmartView directly on an already-annotated tree, **without re-running the 
   --output_path ./dummy \
   --only_visualization \
   --raw_alg seqs.aln
-
-# Remote access
-./og_delineation.py \
-  --tree ./ogd_results/tree.tree_annot.nw \
-  --output_path ./dummy \
-  --only_visualization \
-  --user_IP 192.168.1.100
 ```
 
 | Flag | Runs pipeline | Generates output files | Opens SmartView |
@@ -268,31 +274,17 @@ Opens SmartView directly on an already-annotated tree, **without re-running the 
 
 ### Optional Modules
 
-#### Sequence Recovery (HMMER-based)
-
-Requires a sequence alignment file (`--raw_alg`).
-
-| Argument | Values | Description |
-|----------|--------|-------------|
-| `--raw_alg PATH` | — | Input alignment file (FASTA) |
-| `--run_recovery` | `run-align` / `skip-align` | Enable recovery; `run-align` re-aligns, `skip-align` uses `--raw_alg` directly |
-
-```bash
-# Recovery with re-alignment
-./og_delineation.py --tree tree.nw --output_path ./ogd_results \
-  --raw_alg seqs.faa --run_recovery run-align
-
-# Recovery skipping alignment step (use provided alignment directly)
-./og_delineation.py --tree tree.nw --output_path ./ogd_results \
-  --raw_alg seqs.aln --run_recovery skip-align
-```
-
 #### eggNOG-mapper Annotation
 
-Requires a sequence alignment file and eggNOG databases.
+OGD can enrich the sequences in the tree with functional annotations using **eggNOG-mapper** (emapper). This step is **optional** and requires a sequence alignment (`--raw_alg`).
+
+eggNOG-mapper and its databases (DIAMOND + Pfam) are installed and managed separately from OGD. Install emapper and download its databases following the eggNOG-mapper documentation:
+
+> **eggNOG-mapper:** https://github.com/eggnogdb/eggnog-mapper
 
 | Argument | Description |
 |----------|-------------|
+| `--raw_alg PATH` | Input alignment file (FASTA), required for emapper |
 | `--run_emapper` | Run eggNOG-mapper (DIAMOND + HMM) |
 | `--emapper_dmnd_db PATH` | DIAMOND database for eggNOG-mapper |
 | `--emapper_pfam_db PATH` | PFAM HMM database |
@@ -325,7 +317,6 @@ Requires a sequence alignment file and eggNOG databases.
 | `<tree>.seq2ogs.jsonl` | Sequence → OG mapping (JSONL, one line per sequence) | Always |
 | `<tree>_pairs_clean.tsv` | All ortholog pairs | Without `--skip_get_pairs` |
 | `<tree>_pairs_strict.tsv` | High-confidence ortholog pairs | Without `--skip_get_pairs` |
-| HMM profiles + recovery files | Recovered sequences and HMM assignments | With `--run_recovery` |
 | eggNOG-mapper annotations | Functional annotations, PFAM domains | With `--run_emapper` |
 
 ### `ogs_info.tsv` columns
@@ -338,7 +329,6 @@ Requires a sequence alignment file and eggNOG databases.
 | `SciName_TaxoLevel` | Scientific name of the taxonomic level |
 | `NumSP` | Number of species in the OG |
 | `NumSeqs` | Number of sequences in the OG |
-| `NumRecoverySeqs` | Number of sequences added by recovery |
 | `OG_up` / `OG_down` | Parent / child OGs (hierarchy) |
 | `Inparalogs_Rate` | In-paralogs rate at the duplication node |
 | `SP_overlap_dup` | Species overlap score at the duplication node |
@@ -351,26 +341,26 @@ Requires a sequence alignment file and eggNOG databases.
 ### Minimal run
 
 ```bash
-./og_delineation.py --tree tree.nw --output_path ./ogd_results
+./og_delineation.py --tree data/P53.fa.nw --output_path ./ogd_results
 ```
 
 ### With MinVar rooting
 
 ```bash
-./og_delineation.py --tree tree.nw --output_path ./ogd_results --rooting MinVar
+./og_delineation.py --tree data/P53.fa.nw --output_path ./ogd_results --rooting MinVar
 ```
 
 ### Run and visualize immediately
 
 ```bash
-./og_delineation.py --tree tree.nw --output_path ./ogd_results --open_visualization
+./og_delineation.py --tree data/P53.fa.nw --output_path ./ogd_results --open_visualization
 ```
 
 ### Visualize a previous result without re-running
 
 ```bash
 ./og_delineation.py \
-  --tree ./ogd_results/tree.tree_annot.nw \
+  --tree ./ogd_results/<tree>.tree_annot.nw \
   --output_path ./dummy \
   --only_visualization
 ```
@@ -385,31 +375,16 @@ Requires a sequence alignment file and eggNOG databases.
   --sp_ovlap_arq 0.10
 ```
 
-### With sequence recovery
-
-```bash
-./og_delineation.py --tree tree.nw --output_path ./ogd_results \
-  --raw_alg seqs.aln --run_recovery run-align
-```
-
-### Full run with recovery and functional annotation
+### Run with functional annotation (eggNOG-mapper)
 
 ```bash
 ./og_delineation.py --tree tree.nw --output_path ./ogd_results \
   --rooting MinVar \
   --raw_alg seqs.aln \
-  --run_recovery run-align \
   --run_emapper \
   --emapper_dmnd_db /path/to/eggnog.dmnd \
   --emapper_pfam_db /path/to/pfam.hmm \
   --open_visualization
-```
-
-### GTDB taxonomy (prokaryotic genomes)
-
-```bash
-./og_delineation.py --tree tree.nw --output_path ./ogd_results \
-  --taxonomy_type GTDB
 ```
 
 ### Remote visualization
@@ -418,3 +393,10 @@ Requires a sequence alignment file and eggNOG databases.
 ./og_delineation.py --tree tree.nw --output_path ./ogd_results \
   --open_visualization --user_IP 192.168.1.100
 ```
+
+---
+
+## Current Limitations
+
+- **GTDB taxonomy** (`--taxonomy_type GTDB`) is experimental and not fully supported yet.
+- The **sequence recovery** module is not ready for general use yet and is therefore not documented here.
