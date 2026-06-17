@@ -343,6 +343,6 @@ def update_ogs_info(ogs_info, best_match):
         
     for og, seqs in og2seqs.items():
         ogs_info[og]['RecoverySeqs'] = ogs_info[og]['RecoverySeqs'] + seqs
-        ogs_info[og]['NumRecoverySeqs'] = str(len(ogs_info[og]['RecoverySeqs']))
+        ogs_info[og]['NumRecoverySeqs'] = len(ogs_info[og]['RecoverySeqs'])
 
     return ogs_info
