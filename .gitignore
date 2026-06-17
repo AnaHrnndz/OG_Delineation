@@ -25,3 +25,11 @@ taxa.sqlite
 # Notebooks y SO
 .ipynb_checkpoints/
 .DS_Store
+
+
+git_diff_file.txt
+BUG_REPORT.md
+BUGS.md
+
+deprecated/
+data/
