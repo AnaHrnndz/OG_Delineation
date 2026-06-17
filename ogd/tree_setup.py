@@ -79,7 +79,7 @@ def _apply_rooting(tree: PhyloTree, method: str, tmpdir: Path, species_delimiter
     elif method == "MinVar":
         # _run_minvar handles its own logging and error reporting
         tree = _run_minvar(tree, tmpdir, species_delimiter)
-        
+        tree.set_species_naming_function(lambda node: node.name.split(species_delimiter)[0])
     elif method is None or method == '':
         logging.info("No rooting method specified. Tree will not be rooted.")
     else:
