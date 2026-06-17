@@ -74,6 +74,8 @@ def get_all_pairs(tree: PhyloTree, total_outliers: Set[str]) -> Tuple[Set[Tuple]
                 ortho_tax = ortho_taxids[l_ortho]
 
                 # Orthologs must be from different species
+                if source_tax is None or ortho_tax is None:
+                    continue
                 if source_tax == ortho_tax:
                     continue
 

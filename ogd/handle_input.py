@@ -76,6 +76,15 @@ def _load_gene_tree(tree_path: Path, species_delimiter: str) -> PhyloTree:
     # This function sets how species are identified from leaf names
     t.set_species_naming_function(lambda node: node.name.split(species_delimiter)[0])
 
+    # Validate that the delimiter is present in all leaf names
+    missing = [leaf.name for leaf in t if species_delimiter not in leaf.name]
+    if missing:
+        logging.error(
+            f"Species delimiter '{species_delimiter}' not found in {len(missing)} leaf name(s). "
+            f"Example: '{missing[0]}'. Please check your --sp_delim parameter."
+        )
+        sys.exit(1)
+
     return t
 
 def _load_taxonomy(taxonomy_type: str, user_taxonomy_path: Path = None) -> TaxonomyDB:
@@ -115,7 +124,14 @@ def _load_reftree(rtree_path: Path, gene_tree: PhyloTree, taxonomy_db: TaxonomyD
              logging.warning(f"User-provided reftree not found at '{rtree_path}'.")
         logging.info("Generating reference species tree from gene tree content.")
         species_list = gene_tree.get_species()
-        ref_tree = taxonomy_db.get_topology(species_list)
+        try:
+            ref_tree = taxonomy_db.get_topology(species_list)
+        except Exception as e:
+            logging.error(
+                f"Failed to build reference species tree. Taxid not found in taxonomy DB: {e}. "
+                f"Check that all species identifiers in your tree exist in the taxonomy database."
+            )
+            sys.exit(1)
 
     # Annotate the tree with lineage and other info from the database.
     taxonomy_db.annotate_tree(ref_tree, taxid_attr="name")

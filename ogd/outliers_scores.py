@@ -1,5 +1,6 @@
 
 
+import sys
 from collections import Counter, defaultdict
 from typing import Set, Dict, Any, Tuple, List
 import logging
@@ -78,6 +79,8 @@ def detect_long_leaves_branches(t: PhyloTree) -> Set[str]:
     
     long_leaves = set()
     for leaf in t:
+        if leaf.dist is None:
+            continue
         if leaf.dist > threshold:
             long_leaves.add(leaf.name)
             leaf.add_prop('long_branch_outlier', 'True')
@@ -93,6 +96,13 @@ def _process_internal_node(
     Processes a single internal node: detects outliers, classifies leaves, 
     calculates scores, and determines the evolutionary event type.
     """
+
+    if len(n.children) != 2:
+        # resolve_polytomy() only resolves nodes with >2 children. Unary nodes (1 child)
+        # can appear in valid Newick files and are skipped here since all scoring logic
+        # (Species Overlap, duplication score, etc.) assumes a bifurcating tree.
+        logging.warning(f"Node {n.name} has {len(n.children)} children, expected 2. Skipping.")
+        return set()
 
     n.add_prop('old_lca_name', n.props.get('sci_name'))
 
@@ -239,6 +249,11 @@ def outliers_detection(n, lineage_thr, best_tax_thr, content, level2sp_mem, sp_o
             all species from that lineage are considered outliers.
             """
             
+            # A taxon in the lineage may not exist in level2sp_mem if the reference tree
+            # does not cover all taxa in the taxonomy DB. Skip it and continue evaluating
+            # the rest of the lineage rather than crashing.
+            if str(l) not in level2sp_mem:
+                continue
             lin_rareness  = len(sp_per_level_in_node[str(l)]) / len(level2sp_mem[(str(l))])
 
             if lin_rareness < lineage_thr:
@@ -335,7 +350,7 @@ def update_taxonomical_props(n, sp_in, taxonomy_db):
         n.add_prop('lca_node', 'Empty')
         n.add_prop('lca_node_name', 'Empty')
         n.add_prop('rank', 'Empty')
-        n.props['sci_name'] = n.props.get('Empty')
+        n.props['sci_name'] = 'Empty'
 
 
 # 4. Scores calculation and species loss
@@ -366,6 +381,11 @@ def _calculate_and_set_scores(n: PhyloTree, node_classification: Dict, sp_out: S
 def get_inparalogs_rate(leaves_in):
     """Calculate the median number of inparalogs inparalogs = seqs that belong to the same species"""
 
+    # If all leaves in the node are outliers, leaves_in is empty and np.median([])
+    # would return NaN with a RuntimeWarning. Return 0.0 instead as a safe default.
+    if not leaves_in:
+        return 0.0
+
     list_sp_in = [l.props.get('taxid') for l in leaves_in]
     
     dups_per_sp = Counter(list_sp_in)
@@ -375,9 +395,7 @@ def get_inparalogs_rate(leaves_in):
     return inparalogs_rate
 
 def get_score1(len_sp_in, num_total_sp):
-   
-    score1 = float(len_sp_in/num_total_sp)
-    return score1
+    return float(len_sp_in / num_total_sp) if num_total_sp else 0.0
 
 def get_score2(len_sp_in, nseqs):
 
@@ -421,9 +439,10 @@ def sp_lost(n, sp_out, level2sp_mem):
         perc_diff_sp = 1.0
 
     else:
-        
+        if lca_node not in level2sp_mem:
+            logging.error(f"Taxid '{lca_node}' not found in level2sp_mem. Please check your taxids.")
+            sys.exit(1)
         expected_sp = level2sp_mem[lca_node]
-
         if len(sp_in) == 0 or len(expected_sp) == 0:
             diff_sp = expected_sp.difference(sp_in)
             perc_diff_sp = 1.0
