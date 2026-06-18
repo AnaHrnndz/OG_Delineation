@@ -216,41 +216,86 @@ def draw_pfam_domains(tree, len_alg=None):
     return draw_node
 
 
-def draw_kegg_ko(node, collapsed):
-    
-    kko = node.props.get('kegg_ko', '')
-    
-    if node.is_leaf or collapsed:
+#def draw_kegg_ko(node, collapsed):
+#    
+#    kko = node.props.get('kegg_ko', '')
+#    
+#    if node.is_leaf or collapsed:
+#
+#        return [TextFace(kko, style={'fill': 'purple'}, column=3, position='aligned'),
+#                RectFace(wmax= 5, style={'fill': 'white'},  column=4, position = 'aligned')]
 
+
+#def draw_kegg_path(node, collapsed):
+#    
+#    kpath = node.props.get('kegg_path', '')
+#    
+#    if node.is_leaf or collapsed:
+#
+#        return [TextFace(kpath, style={'fill': 'purple'}, column=5, position='aligned'),
+#                RectFace(wmax= 5, style={'fill': 'white'},  column=6, position = 'aligned')]
+
+
+#def draw_pref_name(node, collapsed):
+#    
+#    pref_name = node.props.get('pref_name', '')
+#    
+#    if node.is_leaf or collapsed:
+#
+#        return [TextFace(pref_name, style={'fill': 'purple'}, column=7, position='aligned'),
+#                RectFace(wmax= 5, style={'fill': 'white'},  column=8, position = 'aligned')]
+#
+
+#def draw_basal_og(node, collapsed):
+#    
+#    basal_og = node.props.get('basal_og', '')
+#    
+#    if node.is_leaf or collapsed:
+#
+#        return [TextFace(basal_og, style={'fill': 'purple'}, column=9, position='aligned'),
+#                RectFace(wmax= 5, style={'fill': 'white'},  column=10, position = 'aligned')]
+    
+def draw_kegg_ko(node, collapsed):
+    kko = _display_annot(node.props.get('kegg_ko', ''))
+    if (node.is_leaf or collapsed) and kko:
         return [TextFace(kko, style={'fill': 'purple'}, column=3, position='aligned'),
-                RectFace(wmax= 5, style={'fill': 'white'},  column=4, position = 'aligned')]
+                RectFace(wmax=5, style={'fill': 'white'}, column=4, position='aligned')]
 
 
 def draw_kegg_path(node, collapsed):
-    
-    kpath = node.props.get('kegg_path', '')
-    
-    if node.is_leaf or collapsed:
-
+    kpath = _display_annot(node.props.get('kegg_path', ''))
+    if (node.is_leaf or collapsed) and kpath:
         return [TextFace(kpath, style={'fill': 'purple'}, column=5, position='aligned'),
-                RectFace(wmax= 5, style={'fill': 'white'},  column=6, position = 'aligned')]
+                RectFace(wmax=5, style={'fill': 'white'}, column=6, position='aligned')]
 
 
 def draw_pref_name(node, collapsed):
-    
-    pref_name = node.props.get('pref_name', '')
-    
-    if node.is_leaf or collapsed:
-
+    pref_name = _display_annot(node.props.get('pref_name', ''))
+    if (node.is_leaf or collapsed) and pref_name:
         return [TextFace(pref_name, style={'fill': 'purple'}, column=7, position='aligned'),
-                RectFace(wmax= 5, style={'fill': 'white'},  column=8, position = 'aligned')]
+                RectFace(wmax=5, style={'fill': 'white'}, column=8, position='aligned')]
 
 
 def draw_basal_og(node, collapsed):
-    
-    basal_og = node.props.get('basal_og', '')
-    
-    if node.is_leaf or collapsed:
-
+    basal_og = _display_annot(node.props.get('basal_og', ''))
+    if (node.is_leaf or collapsed) and basal_og:
         return [TextFace(basal_og, style={'fill': 'purple'}, column=9, position='aligned'),
-                RectFace(wmax= 5, style={'fill': 'white'},  column=10, position = 'aligned')]
+                RectFace(wmax=5, style={'fill': 'white'}, column=10, position='aligned')]
+
+def _display_annot(value):
+    """Clean display string for an annotation prop.
+
+    Internal nodes store a consensus '<term>|<percentage>'; leaves store the
+    full per-sequence value as a '|'-separated list. Drop a trailing
+    '|<number>' (the consensus percentage) and show the rest as a comma list.
+    """
+    if not value or value == '-':
+        return ''
+    head, sep, tail = value.rpartition('|')
+    if sep:
+        try:
+            float(tail)
+            value = head          # 'ko_K04451|85.0' -> 'ko_K04451'
+        except ValueError:
+            pass                  # leaf list 'a|b|c' -> keep as is
+    return value.replace('|', ', ')

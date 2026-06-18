@@ -272,25 +272,27 @@ def _annot_tree_main_table(tree: PhyloTree, main_table_path: Path) -> PhyloTree:
 
     # 2. Annotate the tree
     for node in tree.traverse():
-        leaf_names = list(node.leaf_names())
-        
-        # Add direct annotation to leaf nodes
+
+        # Leaves keep their own full, per-sequence annotation (no consensus)
         if node.is_leaf:
             for annot_type in seq2info.keys():
                 lannot = seq2info[annot_type].get(node.name, [None])
-                node.add_prop(annot_type, lannot)
-        
-        # Add consensus annotation to *all* nodes (overwrites leaf-specific lists)
-        kko_top_term = calculate_best_terms(leaf_names, seq2info, "kegg_ko")
-        kpath_top_term = calculate_best_terms(leaf_names, seq2info, "kegg_path")
-        pname_top_term = calculate_best_terms(leaf_names, seq2info, "pref_name")
-        basal_og_top_term = calculate_best_terms(leaf_names, seq2info, "basal_og")
+                #node.add_prop(annot_type, ",".join(v for v in lannot if v) or "-")
+                node.add_prop(annot_type, "|".join(v for v in lannot if v) or "-")
 
-        if kko_top_term: node.add_prop('kegg_ko', kko_top_term)
-        if kpath_top_term: node.add_prop('kegg_path', kpath_top_term)
-        if pname_top_term: node.add_prop('pref_name', pname_top_term)
-        if basal_og_top_term: node.add_prop('basal_og', basal_og_top_term)
-        
+        # Internal nodes get the consensus term (+ % of sequences sharing it)
+        else:
+            leaf_names = list(node.leaf_names())
+            kko_top_term = calculate_best_terms(leaf_names, seq2info, "kegg_ko")
+            kpath_top_term = calculate_best_terms(leaf_names, seq2info, "kegg_path")
+            pname_top_term = calculate_best_terms(leaf_names, seq2info, "pref_name")
+            basal_og_top_term = calculate_best_terms(leaf_names, seq2info, "basal_og")
+
+            if kko_top_term: node.add_prop('kegg_ko', kko_top_term)
+            if kpath_top_term: node.add_prop('kegg_path', kpath_top_term)
+            if pname_top_term: node.add_prop('pref_name', pname_top_term)
+            if basal_og_top_term: node.add_prop('basal_og', basal_og_top_term)
+
     return tree
 
 # --- Alternative Annotation Method ---
