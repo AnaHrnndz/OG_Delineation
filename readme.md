@@ -62,7 +62,7 @@ Enriches sequences with functional annotations (DIAMOND + HMM) using **eggNOG-ma
 | Tool | Usage | Notes |
 |------|-------|-------|
 | **FastRoot.py** | MinVar tree rooting | Required only with `--rooting MinVar` |
-| **eggNOG-mapper** | Functional annotation | Required only with `--run_emapper` (see [Optional Modules](#optional-modules)) |
+| **eggNOG-mapper** | Functional annotation (**Linux only**) | Required only with `--run_emapper` (see [Optional Modules](#optional-modules)) |
 
 ### Taxonomy Database
 
@@ -78,8 +78,8 @@ git clone https://github.com/AnaHrnndz/OG_Delineation.git
 cd OG_Delineation
 
 # Create and activate the conda environment
-conda env create -f ogd_env2.yml
-conda activate ogd_env2
+conda env create -f ogd_env.yml
+conda activate ogd_env
 ```
 
 This installs the dependencies used for OG delineation (`ete4`, `FastRoot`).
@@ -278,6 +278,8 @@ Opens SmartView directly on an already-annotated tree, **without re-running the 
 
 OGD can enrich the sequences in the tree with functional annotations using **eggNOG-mapper** (emapper). This step is **optional** and requires a sequence alignment (`--raw_alg`).
 
+> **Note — Linux only.** The eggNOG-mapper module currently runs on **Linux only**: the pip-installed eggNOG-mapper bundles a Linux DIAMOND binary that fails on macOS (`cannot execute binary file`). Everything else (the core OG delineation, rooting, visualization) works on both Linux and macOS.
+
 eggNOG-mapper and its databases (DIAMOND + Pfam) are installed and managed separately from OGD. Install emapper and download its databases following the eggNOG-mapper documentation:
 
 > **eggNOG-mapper:** https://github.com/eggnogdb/eggnog-mapper
@@ -398,5 +400,6 @@ eggNOG-mapper and its databases (DIAMOND + Pfam) are installed and managed separ
 
 ## Current Limitations
 
+- The **eggNOG-mapper annotation** module (`--run_emapper`) runs on **Linux only** (the pip-installed eggNOG-mapper bundles a Linux-only DIAMOND binary). The core OG delineation works on Linux and macOS.
 - **GTDB taxonomy** (`--taxonomy_type GTDB`) is experimental and not fully supported yet.
 - The **sequence recovery** module is not ready for general use yet and is therefore not documented here.
