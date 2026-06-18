@@ -263,7 +263,7 @@ def draw_kegg_ko(node, collapsed):
 
 
 def draw_kegg_path(node, collapsed):
-    kpath = _display_annot(node.props.get('kegg_path', ''))
+    kpath = _display_annot(node.props.get('kegg_path', ''), max_terms=3)
     if (node.is_leaf or collapsed) and kpath:
         return [TextFace(kpath, style={'fill': 'purple'}, column=5, position='aligned'),
                 RectFace(wmax=5, style={'fill': 'white'}, column=6, position='aligned')]
@@ -282,12 +282,13 @@ def draw_basal_og(node, collapsed):
         return [TextFace(basal_og, style={'fill': 'purple'}, column=9, position='aligned'),
                 RectFace(wmax=5, style={'fill': 'white'}, column=10, position='aligned')]
 
-def _display_annot(value):
+def _display_annot(value, max_terms=None):
     """Clean display string for an annotation prop.
 
     Internal nodes store a consensus '<term>|<percentage>'; leaves store the
     full per-sequence value as a '|'-separated list. Drop a trailing
-    '|<number>' (the consensus percentage) and show the rest as a comma list.
+    '|<number>' (the consensus percentage), then show the terms as a comma
+    list. If max_terms is set, show only the first N and append '(+rest)'.
     """
     if not value or value == '-':
         return ''
@@ -297,5 +298,8 @@ def _display_annot(value):
             float(tail)
             value = head          # 'ko_K04451|85.0' -> 'ko_K04451'
         except ValueError:
-            pass                  # leaf list 'a|b|c' -> keep as is
-    return value.replace('|', ', ')
+            pass
+    terms = value.split('|')
+    if max_terms and len(terms) > max_terms:
+        return ', '.join(terms[:max_terms]) + f' (+{len(terms) - max_terms})'
+    return ', '.join(terms)
