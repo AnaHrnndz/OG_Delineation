@@ -13,14 +13,14 @@ authors = [
     { name = "Ana Hernández" },   # <- ajusta nombre / añade email si quieres
 ]
 dependencies = [
-    "ete4>=4.4",
-    "FastRoot",
-    "numpy",
+    "ete4==4.4.0",
+    "FastRoot==1.5",
+    "numpy==2.2.6",
 ]
 
 # Optional functional-annotation module (Linux only: see README).
 [project.optional-dependencies]
-emapper = ["eggnog-mapper"]
+emapper = ["eggnog-mapper==2.1.13"]
 
 [project.scripts]
 og-delineation = "ogd.main:main"
