@@ -84,7 +84,12 @@ def run_ogd_pipeline(args: argparse.Namespace):
     # --- Step 8: (Optional) Emapper Annotation ---
     if args.run_emapper:
         logging.info("\n--- Step 8 (Optional): Running eggNOG-Mapper Annotation ---")
-        processed_tree = annotate_with_emapper(processed_tree, str(args.alg), temp_dir, args.emapper_dmnd, args.emapper_pfam)
+        processed_tree = annotate_with_emapper(processed_tree, str(args.alg), temp_dir,
+                                       args.emapper_dmnd, args.emapper_pfam,
+                                       cpu=args.emapper_cpu,
+                                       no_usemem=args.emapper_no_usemem,
+                                       num_workers=args.emapper_num_workers,
+                                       num_servers=args.emapper_num_servers)
     else:
         logging.info("\n--- Step 8 (Optional): Skipped eggNOG-Mapper Annotation ---")
 

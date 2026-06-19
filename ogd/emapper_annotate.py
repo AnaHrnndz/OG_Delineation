@@ -14,6 +14,7 @@ import random
 import subprocess
 from collections import Counter, defaultdict
 from pathlib import Path
+import sys
 
 from ete4 import PhyloTree, SeqGroup, Tree
 
@@ -26,7 +27,8 @@ def annotate_with_emapper(
     alignment_path: str, 
     tmpdir: Path, 
     emapper_dmnd_db: str, 
-    emapper_pfam_db: str
+    emapper_pfam_db: str,
+    cpu=4, no_usemem=False, num_workers=4, num_servers=1
 ) -> PhyloTree:
     """
     Runs the full emapper annotation pipeline and adds results to the tree.
@@ -47,10 +49,11 @@ def annotate_with_emapper(
     raw_fasta_path = _alignment_to_raw_fasta(alignment_path, tmpdir)
 
     # 2. Run emapper.py (for main annotations)
-    main_table_path = _run_emapper(raw_fasta_path, tmpdir, emapper_dmnd_db)
+    main_table_path = _run_emapper(raw_fasta_path, tmpdir, emapper_dmnd_db, cpu)
 
     # 3. Run hmm_mapper.py (for Pfam domains)
-    pfam_table_path = _run_hmm_mapper(raw_fasta_path, tmpdir, emapper_pfam_db)
+    pfam_table_path = _run_hmm_mapper(raw_fasta_path, tmpdir, emapper_pfam_db,
+                                      cpu, no_usemem, num_workers, num_servers)
 
     # 4. Annotate the tree with the results
     logging.info("Annotating tree with emapper main results...")
@@ -80,7 +83,7 @@ def _alignment_to_raw_fasta(alignment_path: str, tmpdir: Path) -> Path:
         
     return raw_fasta_path
 
-def _run_emapper(raw_fasta_path: Path, tmpdir: Path, emapper_dmnd_db: str) -> Path:
+def _run_emapper(raw_fasta_path: Path, tmpdir: Path, emapper_dmnd_db: str, cpu: int = 4) -> Path:
     """
     Runs the main emapper.py script.
     """
@@ -92,7 +95,7 @@ def _run_emapper(raw_fasta_path: Path, tmpdir: Path, emapper_dmnd_db: str) -> Pa
     command = [
         "emapper.py",
         "--sensmode", "fast",
-        "--cpu", "8",
+        "--cpu", str(cpu),
         "--data_dir", str(data_dir),
         "--temp_dir", str(tmpdir),
         "-i", str(raw_fasta_path),
@@ -117,7 +120,8 @@ def _run_emapper(raw_fasta_path: Path, tmpdir: Path, emapper_dmnd_db: str) -> Pa
         
     return output_table
 
-def _run_hmm_mapper(raw_fasta_path: Path, tmpdir: Path, emapper_pfam_db: str) -> Path:
+def _run_hmm_mapper(raw_fasta_path: Path, tmpdir: Path, emapper_pfam_db: str, cpu: int = 4, 
+                    no_usemem: bool = False, num_workers: int = 4, num_servers: int = 1 ) -> Path:
     """
     Runs the hmm_mapper.py script for Pfam annotations.
     """
@@ -131,8 +135,7 @@ def _run_hmm_mapper(raw_fasta_path: Path, tmpdir: Path, emapper_pfam_db: str) ->
 
     command = [
         "hmm_mapper.py",
-        "--cut_ga", "--clean_overlaps", "clans", "--usemem",
-        "--num_servers", "1", "--num_workers", "4", "--cpu", "4",
+        "--cut_ga", "--clean_overlaps", "clans", "--cpu", str(cpu),
         "--dbtype", "hmmdb",
         "--data_dir", str(data_dir),
         "-d", str(db_path),
@@ -142,6 +145,12 @@ def _run_hmm_mapper(raw_fasta_path: Path, tmpdir: Path, emapper_pfam_db: str) ->
         "-o", output_file_base,
         "--output_dir", str(tmpdir)
     ]
+    # In-memory HMM daemon (hmmpgmd, --usemem): ON on Linux for speed, OFF on macOS
+    # (does not start reliably) and whenever --emapper_no_usemem is set.
+    if sys.platform.startswith("linux") and not no_usemem:
+        command += ["--usemem",
+                    "--num_servers", str(num_servers),
+                    "--num_workers", str(num_workers)]
     
     try:
         subprocess.run(command, shell=False, check=True, capture_output=True, text=True)

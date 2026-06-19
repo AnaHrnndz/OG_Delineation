@@ -90,6 +90,17 @@ def get_args() -> argparse.Namespace:
                          help="Enable the sequence recovery module.")
     modules.add_argument('--run_emapper', action='store_true',
                          help="Run emapper for functional annotation.")
+    modules.add_argument('--emapper_cpu', type=int, default=4,
+                     help="CPUs for eggNOG-mapper steps (DIAMOND and HMM). Default: 4.")
+    modules.add_argument('--emapper_num_workers', type=int, default=4,
+                     help="hmmpgmd workers for the HMM step. Only used with the in-memory "
+                          "daemon (Linux, unless --emapper_no_usemem). Default: 4.")
+    modules.add_argument('--emapper_num_servers', type=int, default=1,
+                     help="hmmpgmd servers for the HMM step (in-memory daemon only). Default: 1.")
+    modules.add_argument('--emapper_no_usemem', action='store_true',
+                     help="Disable eggNOG-mapper's in-memory HMM daemon (hmmpgmd) and use "
+                          "plain hmmscan for the Pfam step. Slower but more robust. By default "
+                          "usemem is ON on Linux and OFF on macOS.")
     modules.add_argument('--emapper_dmnd_db', dest='emapper_dmnd', type=Path,
                          help="Path to emapper's DIAMOND database.")
     modules.add_argument('--emapper_pfam_db', dest='emapper_pfam', type=Path,
