@@ -9,12 +9,11 @@ from io import StringIO
 import re
 
 
-DOMAIN2COLOR = Path(__file__).parent.parent / "data/smartview/pfam2color.json"
+DOMAIN2COLOR = Path(__file__).parent / "data/smartview/pfam2color.json"
 
 def get_colormap():
-    with open(Path(__file__).parent / DOMAIN2COLOR) as handle:
+    with open(DOMAIN2COLOR) as handle:
         _pfam2color = json.load(handle)
-    return _pfam2color
 
 colormap = get_colormap()
 

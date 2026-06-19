@@ -72,17 +72,34 @@ Enriches sequences with functional annotations (DIAMOND + HMM) using **eggNOG-ma
 
 ## 🛠️ Installation
 
-```bash
-# Clone the repository
+### Option 1 — pip (recommended)
+
+​```bash
 git clone https://github.com/AnaHrnndz/OG_Delineation.git
 cd OG_Delineation
 
-# Create and activate the conda environment
+pip install .              # core OG delineation
+pip install ".[emapper]"   # optional: eggNOG-mapper annotation (Linux only)
+​```
+
+This pulls the dependencies (`ete4`, `FastRoot`, `numpy`) and installs the **`og-delineation`** command. To install without cloning (e.g. as a dependency of another tool):
+
+​```bash
+pip install "git+https://github.com/AnaHrnndz/OG_Delineation.git"
+​```
+
+### Option 2 — conda environment
+
+​```bash
+git clone https://github.com/AnaHrnndz/OG_Delineation.git
+cd OG_Delineation
+
 conda env create -f ogd_env.yml
 conda activate ogd_env
-```
+pip install .              # install OGD into the environment
+​```
 
-This installs the dependencies used for OG delineation (`ete4`, `FastRoot`).
+The conda environment pins the dependency versions; `pip install .` then adds the `og-delineation` command.
 
 ---
 
@@ -125,7 +142,7 @@ Leaf names must encode the species as `SpeciesID<delimiter>GeneName`, with the d
 ./og_delineation.py -h
 ```
 
-> If `./og_delineation.py` is not executable, run `python og_delineation.py ...` instead, or make it executable once with `chmod +x og_delineation.py`.
+> **Running OGD.** If you installed with pip, use the `og-delineation` command. The examples below use `./og_delineation.py` (running from a clone) — the two are equivalent, so just swap `./og_delineation.py` for `og-delineation`. You can also use `python -m ogd`.
 
 ---
 
