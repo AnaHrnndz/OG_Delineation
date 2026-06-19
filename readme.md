@@ -309,6 +309,12 @@ eggNOG-mapper and its databases (DIAMOND + Pfam) are installed and managed separ
 | `--emapper_pfam_db PATH` | PFAM HMM database |
 | `--path2emapper_main PATH` | Use pre-computed eggNOG-mapper results (main table) |
 | `--path2emapper_pfams PATH` | Use pre-computed eggNOG-mapper results (PFAM table) |
+| `--emapper_cpu INT` | CPUs for the eggNOG-mapper steps (DIAMOND + HMM). Default: 4 |
+| `--emapper_no_usemem` | Disable the in-memory HMM daemon (`hmmpgmd`) and use plain `hmmscan` for the Pfam step. Slower but more robust. By default the daemon is **on** on Linux and **off** on macOS |
+| `--emapper_num_workers INT` | `hmmpgmd` workers for the Pfam step. Only used with the in-memory daemon (Linux, unless `--emapper_no_usemem`). Default: 4 |
+| `--emapper_num_servers INT` | `hmmpgmd` servers for the Pfam step. In-memory daemon only. Default: 1 |
+
+> **Performance tuning.** `--emapper_cpu` sets the total CPUs for both steps. With the in-memory HMM daemon (Linux), those CPUs are split across `--emapper_num_servers` × `--emapper_num_workers` (so `cpus_per_worker = cpu / (servers × workers)`); choose values where `servers × workers` divides `cpu` to avoid leaving cores idle. On macOS the daemon is not used — the Pfam step runs via `hmmscan` and the `--emapper_num_workers` / `--emapper_num_servers` flags are ignored.
 
 ```bash
 # Run eggNOG-mapper annotation
