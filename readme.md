@@ -1,4 +1,16 @@
-## 🧬 OGD: Orthologous Group Delineation
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/OGD_logo_dark.png">
+    <img src="docs/OGD_logo_light.png" alt="OGD — OG_Delineation" width="320">
+  </picture>
+</p>
+
+
+
+
+## Orthologous Group Delineation
+
+
 
 **OGD** is a Python bioinformatics pipeline for **Orthologous Group Delineation** from gene phylogenetic trees. It identifies orthologous groups (OGs) based on the detection and scoring of gene duplication events, using ETE4 for tree manipulation. NCBI taxonomy is the supported backend; GTDB support is experimental (see [Current Limitations](#current-limitations)).
 
