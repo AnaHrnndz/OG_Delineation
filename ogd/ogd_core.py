@@ -16,7 +16,7 @@ from ogd.outliers_scores import run_outliers_and_scores
 from ogd.select_dups import run_get_main_dups
 from ogd.orthologs_groups import get_all_ogs
 import ogd.pairs as pairs
-from ogd.emapper_annotate import annotate_with_emapper
+from ogd.emapper_annotate import annotate_with_emapper, annotate_with_precomputed
 from ogd.recovery import recover_sequences
 import ogd.prepare_outputs as prepare_outputs 
 from ogd.run_ete4_smartview import run_smartview
@@ -90,6 +90,14 @@ def run_ogd_pipeline(args: argparse.Namespace):
                                        no_usemem=args.emapper_no_usemem,
                                        num_workers=args.emapper_num_workers,
                                        num_servers=args.emapper_num_servers)
+    elif args.path2emapper_main or args.path2emapper_pfams:
+        logging.info("\n--- Step 8 (Optional): Annotating from pre-computed emapper tables ---")
+        processed_tree = annotate_with_precomputed(
+            processed_tree,
+            main_table_path=args.path2emapper_main,
+            pfam_table_path=args.path2emapper_pfams,
+            alignment_path=str(args.alg) if args.alg else None,
+        )
     else:
         logging.info("\n--- Step 8 (Optional): Skipped eggNOG-Mapper Annotation ---")
 

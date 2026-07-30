@@ -63,6 +63,35 @@ def annotate_with_emapper(
     
     return tree
 
+
+
+def annotate_with_precomputed(
+    tree: PhyloTree,
+    main_table_path: Path = None,
+    pfam_table_path: Path = None,
+    alignment_path: str = None,
+) -> PhyloTree:
+    """
+    Annotate the tree from PRE-COMPUTED emapper tables, WITHOUT running emapper.
+
+    main_table_path: emapper '*.emapper.annotations' table (KEGG KO/Pathway,
+        Preferred_name, basal OG). Optional.
+    pfam_table_path: emapper '*.emapper.hmm_hits' table (Pfam domains). Optional;
+        requires alignment_path for coordinate translation.
+    alignment_path: alignment used to translate Pfam coordinates (only needed with pfam).
+    """
+    if main_table_path:
+        logging.info("Annotating tree with pre-computed emapper main table...")
+        tree = _annot_tree_main_table(tree, main_table_path)
+    if pfam_table_path:
+        if not alignment_path:
+            raise ValueError("Pfam annotation from a pre-computed table requires the alignment (--raw_alg).")
+        logging.info("Annotating tree with pre-computed Pfam table...")
+        tree = _annot_tree_pfam_table(tree, pfam_table_path, alignment_path)
+    return tree
+
+
+
 # --- Emapper Execution Functions ---
 
 def _alignment_to_raw_fasta(alignment_path: str, tmpdir: Path) -> Path:
@@ -257,10 +286,13 @@ def _annot_tree_main_table(tree: PhyloTree, main_table_path: Path) -> PhyloTree:
     seq2info = defaultdict(lambda: defaultdict(list))
     with open(main_table_path) as fin:
         for line in fin:
-            if line.startswith('#'):
+            if line.startswith('#') or not line.strip():
                 continue
 
-            info = line.strip().split('\t')
+            info = line.rstrip('\n').split('\t')
+            if len(info) < 13:
+                logging.warning(f"Skipping malformed emapper line (need >=13 columns, got {len(info)})")
+                continue
             seq_name = info[0]
             
             basal_og = None # Fix for potential UnboundLocalError

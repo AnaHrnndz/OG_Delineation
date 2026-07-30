@@ -130,10 +130,10 @@ def _validate_args(args: argparse.Namespace):
         raise FileNotFoundError(f"Input tree file not found: {args.tree}")
 
     # --- Check dependencies for optional modules ---
-    alignment_needed = args.run_recovery or args.run_emapper
+    alignment_needed = args.run_recovery or args.run_emapper or args.path2emapper_pfams
     
     if alignment_needed and not args.alg:
-        raise ValueError("--run_recovery or --run_emapper requires --raw_alg to be set.")
+        raise ValueError("--run_recovery, --run_emapper or --path2emapper_pfams requires --raw_alg to be set.")
     
     if args.alg and not args.alg.is_file():
         raise FileNotFoundError(f"Alignment file not found: {args.alg}")
@@ -148,13 +148,12 @@ def _validate_args(args: argparse.Namespace):
             raise FileNotFoundError(f"Emapper Pfam DB not found: {args.emapper_pfam}")
 
     # --- Check pre-computed emapper dependencies ---
-    if args.path2emapper_main or args.path2emapper_pfams:
-        if not (args.path2emapper_main and args.path2emapper_pfams):
-            raise ValueError("Both --path2emapper_main and --path2emapper_pfams must be provided together.")
-        if not args.path2emapper_main.is_file():
-            raise FileNotFoundError(f"Emapper main table not found: {args.path2emapper_main}")
-        if not args.path2emapper_pfams.is_file():
-            raise FileNotFoundError(f"Emapper Pfam table not found: {args.path2emapper_pfams}")
+    # main and pfam tables are independent: pass one, the other, or both.
+    # The Pfam table also needs the alignment (enforced via alignment_needed above).
+    if args.path2emapper_main and not args.path2emapper_main.is_file():
+        raise FileNotFoundError(f"Emapper main table not found: {args.path2emapper_main}")
+    if args.path2emapper_pfams and not args.path2emapper_pfams.is_file():
+        raise FileNotFoundError(f"Emapper Pfam table not found: {args.path2emapper_pfams}")
 
     logging.info("Arguments validated successfully.")
 
