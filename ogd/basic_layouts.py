@@ -49,19 +49,19 @@ def draw_node_leafname(node, collapsed):
 def draw_node_evoltype(node):
 
         if node.props.get('monophyletic_og'):
-
             lca = node.props.get('lca_dup')
-            color = colors_taxid.get(lca,'orange')
-            
-            return {'dot': {'shape': 'square', 'radius': 4, 'fill': color } }
-                
+            color = colors_taxid.get(lca, 'orange')
+            # OG root: el más grande + borde oscuro para que resalte sobre el fondo del mismo color
+            return {'dot': {'shape': 'hexagon', 'radius': 5, 'fill': color, 'opacity': 0.75}}
 
         if node.props.get('evoltype_2') == 'S':
-            return {'dot': {'radius': 4, 'fill': 'blue' } }
+            # especiación: círculo pequeño (son mayoría, conviene no recargar)
+            return {'dot': {'radius': 3, 'fill': 'blue'}}
         elif node.props.get('evoltype_2') == 'D':
-            return {'dot': {'radius': 4, 'fill': 'red' } }
+            # duplicación: círculo mediano con borde
+            return {'dot': {'radius': 3, 'fill': 'red'}}
         elif node.props.get('evoltype_2') == 'FD':
-            return {'dot': {'radius': 4, 'fill': 'Coral' } }
+            return {'dot': {'radius': 3, 'fill': 'Coral'}}
     
 
 def draw_node_species_overlap(node):
@@ -83,13 +83,30 @@ def draw_node_support(node):
     return [TextFace( support, style={'fill': 'red'}, position = "bottom", column = 0, fs_min=8, fs_max=10)]
 
 
+
+def _soften(color, amount=0.6):
+    """Blend a hex color toward white (0 = original, 1 = white) for a softer tone."""
+    if not (isinstance(color, str) and color.startswith('#') and len(color) == 7):
+        return color  # named colors (e.g. 'LightGrey') are already soft: leave as-is
+    r, g, b = (int(color[i:i+2], 16) for i in (1, 3, 5))
+    r = round(r + (255 - r) * amount)
+    g = round(g + (255 - g) * amount)
+    b = round(b + (255 - b) * amount)
+    return f'#{r:02x}{g:02x}{b:02x}'
+
+
+
 def draw_node_background_og(node):
 
     if node.props.get('monophyletic_og'):
         lca = node.props.get('lca_node_name')
         
         color = colors_sciname.get(lca, 'orange')
-        return {'box': {'fill':  color } }
+
+        return {'box': {'fill': color, 'fill-opacity': 0.35,
+                        'stroke': color, 'stroke-width': 1.5, 'stroke-opacity': 0.9,
+                        'rx': 8, 'ry': 8}}
+       
             
     
 
