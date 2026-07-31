@@ -255,23 +255,23 @@ def draw_pfam_domains(tree, len_alg=None):
 #                RectFace(wmax= 5, style={'fill': 'white'},  column=10, position = 'aligned')]
     
 def draw_kegg_ko(node, collapsed):
-    kko = _display_annot(node.props.get('kegg_ko', ''))
+    kko = _display_annot(node.props.get('kegg_ko', '').replace('ko_', ''))
     if (node.is_leaf or collapsed) and kko:
-        return [TextFace(kko, style={'fill': 'purple'}, column=3, position='aligned'),
+        return [TextFace(kko, style={'fill': 'orange'}, column=3, position='aligned'),
                 RectFace(wmax=5, style={'fill': 'white'}, column=4, position='aligned')]
 
 
 def draw_kegg_path(node, collapsed):
     kpath = _display_annot(node.props.get('kegg_path', ''), max_terms=3)
     if (node.is_leaf or collapsed) and kpath:
-        return [TextFace(kpath, style={'fill': 'purple'}, column=5, position='aligned'),
+        return [TextFace(kpath, style={'fill': 'green'}, column=5, position='aligned'),
                 RectFace(wmax=5, style={'fill': 'white'}, column=6, position='aligned')]
 
 
 def draw_pref_name(node, collapsed):
     pref_name = _display_annot(node.props.get('pref_name', ''))
     if (node.is_leaf or collapsed) and pref_name:
-        return [TextFace(pref_name, style={'fill': 'purple'}, column=7, position='aligned'),
+        return [TextFace(pref_name, style={'fill': 'blue'}, column=7, position='aligned'),
                 RectFace(wmax=5, style={'fill': 'white'}, column=8, position='aligned')]
 
 
@@ -302,3 +302,8 @@ def _display_annot(value, max_terms=None):
     if max_terms and len(terms) > max_terms:
         return ', '.join(terms[:max_terms]) + f' (+{len(terms) - max_terms})'
     return ', '.join(terms)
+
+
+
+
+
